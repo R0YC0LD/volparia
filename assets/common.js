@@ -29,6 +29,7 @@ const ICONS = {
   settings: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/></svg>`,
   backups: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10m0 0 4-4m-4 4-4-4"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>`,
   audit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.2 2"/></svg>`,
+  pos: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 9.5h18M7 15h4"/></svg>`,
   instagram: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg>`,
   tiktok: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4v10.5a4 4 0 1 1-3.5-4"/><path d="M14.5 5.5c.8 2 2.4 3.2 4.5 3.5"/></svg>`,
   twitter: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m4 4 7 9.5L4.5 20M20 4l-6.6 7.5M13.4 11.5 20 20h-4.5L11 13.5"/></svg>`,
@@ -61,6 +62,7 @@ const defaultSettings = {
   shippingThreshold: 2000,
   criticalStockDefault: 5,
   bankTransfer: true, cashOnDelivery: true,
+  provider: "iyzico", testMode: true, installments: [2, 3, 6],
   supportEmail: "destek@volparia.com", supportPhone: "0850 000 00 00",
   bankName: "", iban: "", accountHolder: "",
   companyName: "VOLPARIA Giyim", companyAddress: "",
@@ -112,11 +114,12 @@ const state = {
   subscribers: readLocal("subscribers", []),
   coupon: readLocal("coupon", null),
   reviewStats: {},
+  pos: { configured: false, provider: "iyzico", testMode: true },
   token: sessionStorage.getItem("volparia_admin_token") || "",
   apiOnline: false, version: null,
   activeFilter: "all", activeGender: "", activeCategory: "", search: "",
   adminView: "dashboard",
-  admin: { products: null, orders: null, coupons: null, reviews: null, subscribers: null, audit: null, productQuery: "", orderQuery: "", customerQuery: "", editing: null, contentKey: "about" }
+  admin: { products: null, orders: null, coupons: null, reviews: null, subscribers: null, audit: null, pos: null, productQuery: "", orderQuery: "", customerQuery: "", editing: null, contentKey: "about" }
 };
 function persist() {
   writeLocal("products", state.products); writeLocal("cart", state.cart); writeLocal("favorites", state.favorites);
@@ -156,26 +159,35 @@ async function bootstrapData(silent = true) {
     if (Array.isArray(data.products)) state.products = data.products;
     if (data.settings && Object.keys(data.settings).length) state.settings = { ...defaultSettings, ...data.settings };
     state.reviewStats = data.reviewStats || {};
+    if (data.pos) state.pos = data.pos;
     state.version = data.v ?? state.version;
     state.apiOnline = true; setStorageIndicator(true);
     persist();
     if (typeof window.onDataRefresh === "function") window.onDataRefresh();
   } catch { state.apiOnline = false; setStorageIndicator(false); if (!silent) toast("Buluta bağlanılamadı, yerel veriler gösteriliyor", false); }
 }
-let syncTimer;
+let syncTimer, syncBusy = false, lastActivity = Date.now(), syncTick = 0;
 async function pollSync() {
-  if (!CONFIG.apiBase || document.hidden) return;
+  if (!CONFIG.apiBase || document.hidden || syncBusy) return;
+  // 5 dakikadır hareketsiz sekmelerde her 10 turda bir yoklanır (ücretsiz kota koruması);
+  // kullanıcı sayfaya dokunduğu anda saniyelik hıza geri döner.
+  syncTick++;
+  if (Date.now() - lastActivity > 5 * 60 * 1000 && syncTick % 10 !== 0) return;
+  syncBusy = true;
   try {
     const d = await api("/api/sync");
     if (!state.apiOnline || d.v !== state.version) await bootstrapData();
   } catch { state.apiOnline = false; setStorageIndicator(false); }
+  finally { syncBusy = false; }
 }
 function startSync() {
   if (!CONFIG.apiBase) return;
   clearInterval(syncTimer);
-  syncTimer = setInterval(pollSync, Math.max(1000, Number(CONFIG.syncIntervalMs) || 3000));
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) bootstrapData(); });
-  window.addEventListener("focus", () => bootstrapData());
+  syncTimer = setInterval(pollSync, Math.max(1000, Number(CONFIG.syncIntervalMs) || 1000));
+  ["mousemove", "keydown", "touchstart", "scroll", "click"].forEach(ev =>
+    document.addEventListener(ev, () => { lastActivity = Date.now(); }, { passive: true }));
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { lastActivity = Date.now(); bootstrapData(); } });
+  window.addEventListener("focus", () => { lastActivity = Date.now(); bootstrapData(); });
 }
 
 /* ---------- stok yardımcıları ---------- */

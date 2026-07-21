@@ -445,6 +445,9 @@ select{appearance:none;-webkit-appearance:none;background-image:url("data:image/
 .cookie-actions{display:flex;gap:9px}
 .cookie-actions .button{padding:10px 16px;font-size:12px}
 
+/* ---------- ödeme iframe ---------- */
+.payment-frame{width:100%;min-height:480px;border:1px solid var(--line);border-radius:12px;background:#fff;margin-top:14px}
+
 /* ---------- footer sosyal ---------- */
 .footer-social{display:flex;gap:9px;margin-top:14px}
 .footer-social a{width:36px;height:36px;border-radius:50%;border:1px solid #3a342b;display:grid;place-items:center;color:#a89f92;transition:.15s}

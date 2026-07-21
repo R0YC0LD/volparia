@@ -273,15 +273,21 @@
         <label class="field full consent-row"><input name="consent" type="checkbox" required><span><button type="button" class="inline-link" data-page="distance">Mesafeli satış sözleşmesini</button> ve <button type="button" class="inline-link" data-page="kvkk">KVKK aydınlatma metnini</button> okudum, kabul ediyorum.</span></label>
         <div class="field full"><button class="button dark full" type="submit">Ödemeye devam et →</button></div>
       </form>`;
-    else if (step === 2) content.innerHTML = `<button class="round-close modal-close" data-close>×</button><span class="eyebrow">SİPARİŞ</span><h2>Ödeme yöntemi</h2><div class="checkout-steps"><i class="active"></i><i class="active"></i><i></i></div>
+    else if (step === 2) {
+      const cardAvailable = state.apiOnline && (state.pos?.configured || state.pos?.testMode);
+      const installments = Array.isArray(state.settings.installments) && state.settings.installments.length ? ` · ${state.settings.installments.join(", ")} taksit` : "";
+      content.innerHTML = `<button class="round-close modal-close" data-close>×</button><span class="eyebrow">SİPARİŞ</span><h2>Ödeme yöntemi</h2><div class="checkout-steps"><i class="active"></i><i class="active"></i><i></i></div>
       <div class="payment-options">
-        ${state.settings.bankTransfer ? `<label><input type="radio" name="payment" value="transfer" checked> Havale / EFT<small>Sipariş sonrası hesap bilgileri görüntülenir</small></label>` : ""}
-        ${state.settings.cashOnDelivery ? `<label><input type="radio" name="payment" value="cod" ${!state.settings.bankTransfer ? "checked" : ""}> Kapıda ödeme<small>Teslimatta nakit veya kartla ödeme</small></label>` : ""}
+        ${state.pos?.testMode && cardAvailable ? `<div class="notice"><b>POS test modu açık.</b> Yönetici canlı POS bilgilerini girene kadar karttan tahsilat yapılmaz; kartla verilen sipariş "ödeme bekleniyor" olarak kaydedilir.</div>` : ""}
+        ${cardAvailable ? `<label><input type="radio" name="payment" value="card" checked> Kredi / Banka kartı<small>3D Secure güvenli ödeme · ${esc(state.pos?.provider === "paytr" ? "PayTR" : "iyzico")}${installments}</small></label>` : ""}
+        ${state.settings.bankTransfer ? `<label><input type="radio" name="payment" value="transfer" ${!cardAvailable ? "checked" : ""}> Havale / EFT<small>Sipariş sonrası hesap bilgileri görüntülenir</small></label>` : ""}
+        ${state.settings.cashOnDelivery ? `<label><input type="radio" name="payment" value="cod" ${!cardAvailable && !state.settings.bankTransfer ? "checked" : ""}> Kapıda ödeme<small>Teslimatta nakit veya kartla ödeme</small></label>` : ""}
       </div>
       <div class="summary-row"><span>Ara toplam</span><b>${money(t.gross)}</b></div>
       ${t.discount ? `<div class="summary-row discount"><span>Kupon (${esc(state.coupon.code)})</span><b>−${money(t.discount)}</b></div>` : ""}
       <div class="summary-row total"><span>Ödenecek</span><b>${money(t.total)}</b></div>
       <div class="checkout-actions"><button class="link-button" id="checkoutBack">← Geri</button><button class="button dark" id="placeOrder">Siparişi oluştur →</button></div>`;
+    }
     else content.innerHTML = `<button class="round-close modal-close" data-close>×</button><span class="eyebrow">SİPARİŞİN ALINDI</span><h2>Teşekkürler, ${esc(form.firstName)}.</h2>
       <p>Sipariş numaran <b>${esc(form.orderNo)}</b>. Durum güncellemeleri ${esc(form.email)} adresine gönderilecek.</p>
       <div class="notice">${esc(form.paymentNote || "Sipariş hazırlık sırasına alındı.")}</div>
@@ -306,9 +312,38 @@
     state.orders.unshift(order);
     state.cart = []; state.coupon = null;
     persist(); renderHeader(); renderProducts(); renderCart();
+    const done = note => checkout(3, { ...form, orderNo: order.orderNo, payment, paymentNote: note });
+    if (payment === "card" && state.apiOnline) {
+      if (state.pos?.testMode) { done("POS test modu açık: karttan tahsilat yapılmadı, sipariş ödeme bekleniyor olarak kaydedildi."); bootstrapData(); return; }
+      try {
+        const pay = await api("/api/payments/init", { method: "POST", body: JSON.stringify({ orderId: order.id }) });
+        if (pay.paymentPageUrl) { showPaymentRedirect(pay.paymentPageUrl); return; }
+        if (pay.iframeUrl) { showPaymentFrame(pay.iframeUrl); return; }
+        if (pay.mode === "test") { done("POS test modu açık: karttan tahsilat yapılmadı, sipariş ödeme bekleniyor olarak kaydedildi."); }
+        else done("Sipariş alındı; ödeme bağlantısı e-posta ile iletilecek.");
+      } catch (err) { done(`Sipariş kaydedildi ancak ödeme başlatılamadı: ${err.message}. Mağaza sizinle iletişime geçecek.`); }
+      bootstrapData();
+      return;
+    }
     const note = payment === "transfer" ? "Havale/EFT bekleniyor; ödeme onaylanınca sipariş hazırlığa alınır." : "Sipariş hazırlık sırasına alındı, teslimatta ödeyeceksiniz.";
-    checkout(3, { ...form, orderNo: order.orderNo, payment, paymentNote: note });
+    done(note);
     if (state.apiOnline) bootstrapData();
+  }
+  function showPaymentRedirect(url) {
+    $("#checkoutContent").innerHTML = `<span class="eyebrow">GÜVENLİ ÖDEME</span><h2>Bankaya yönlendiriliyorsun…</h2><p>3D Secure doğrulaması için güvenli ödeme sayfasına aktarılıyorsun. Otomatik yönlendirme olmazsa aşağıdaki düğmeyi kullan.</p><a class="button dark full" href="${esc(url)}" style="margin-top:16px;text-align:center">Ödeme sayfasını aç →</a>`;
+    setTimeout(() => { window.location.href = url; }, 1200);
+  }
+  function showPaymentFrame(url) {
+    $("#checkoutContent").innerHTML = `<button class="round-close modal-close" data-close>×</button><span class="eyebrow">GÜVENLİ ÖDEME</span><h2>Kart bilgileri</h2><p>Ödeme, PayTR güvenli sayfasında tamamlanır; kart bilgilerin mağazamıza iletilmez.</p><iframe class="payment-frame" src="${esc(url)}" allow="payment"></iframe>`;
+  }
+  function handlePaymentReturn() {
+    const params = new URLSearchParams(location.search);
+    const result = params.get("payment"); if (!result) return;
+    const orderNo = params.get("order") || "";
+    history.replaceState(null, "", location.pathname);
+    $("#pageContent").innerHTML = `<button class="round-close modal-close" data-close>×</button><span class="eyebrow">${result === "success" ? "ÖDEME TAMAMLANDI" : "ÖDEME BAŞARISIZ"}</span><h2>${result === "success" ? "Teşekkürler!" : "Ödeme tamamlanamadı"}</h2><p>${result === "success" ? `<b>${esc(orderNo)}</b> numaralı siparişinin ödemesi bankadan onaylandı. Siparişin hazırlık sürecine alındı.` : `<b>${esc(orderNo)}</b> numaralı sipariş için ödeme doğrulanamadı. Kartını kontrol edip tekrar deneyebilir veya destek ekibimize ulaşabilirsin.`}</p>`;
+    openLayer($("#pageModal"));
+    toast(result === "success" ? "Ödeme onaylandı" : "Ödeme başarısız", result === "success");
   }
 
   /* ---------- bilgi sayfaları ---------- */
@@ -419,6 +454,7 @@
   renderAll();
   setStorageIndicator(false);
   initCookieBanner();
+  handlePaymentReturn();
   bootstrapData(false);
   startSync();
 })();

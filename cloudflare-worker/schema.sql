@@ -31,8 +31,9 @@ CREATE TABLE IF NOT EXISTS orders (
   discount REAL DEFAULT 0,
   coupon_code TEXT,
   status TEXT DEFAULT 'new',          -- new / preparing / shipped / complete / cancelled
-  payment_method TEXT DEFAULT 'transfer',
+  payment_method TEXT DEFAULT 'transfer', -- transfer / cod / card
   payment_status TEXT DEFAULT 'awaiting', -- awaiting / paid / refunded
+  payment_token TEXT,                 -- sanal POS oturum/istek anahtarı
   shipping_address TEXT DEFAULT '',
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP
@@ -77,6 +78,12 @@ CREATE TABLE IF NOT EXISTS images (
   content_type TEXT NOT NULL,
   size INTEGER DEFAULT 0,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS pos_credentials (
+  provider TEXT PRIMARY KEY,          -- iyzico / paytr
+  data TEXT NOT NULL,                 -- AES-GCM ile şifreli kimlik bilgileri
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS store_settings (

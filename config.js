@@ -6,5 +6,5 @@ window.VOLPARIA_CONFIG = {
   apiBase: "",                 // örn: "https://volparia-api.KULLANICIADI.workers.dev"
   storeUrl: "",                // örn: "https://kullaniciadi.github.io/volparia/" (ops.)
   currency: "TRY",
-  syncIntervalMs: 3000         // cihazlar arası otomatik yenileme aralığı (ms)
+  syncIntervalMs: 1000         // cihazlar arası otomatik yenileme aralığı (ms)
 };

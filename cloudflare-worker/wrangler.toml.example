@@ -8,6 +8,10 @@ binding = "DB"
 database_name = "volparia-db"
 database_id = "BURAYA-D1-DATABASE-ID-GELECEK"
 
+[vars]
+# Kart ödemesi sonrası müşterinin geri yönlendirileceği mağaza adresi
+STOREFRONT_URL = "https://r0yc0ld.github.io/volparia/"
+
 # Gizli değerler dosyaya YAZILMAZ, şu komutlarla eklenir:
 #   wrangler secret put ADMIN_PASSWORD
 #   wrangler secret put SESSION_SECRET

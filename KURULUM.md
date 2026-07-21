@@ -33,6 +33,32 @@ Varsayılan giriş: kullanıcı adı `admin`, şifre `12345`
 - **Yedekleme** — tüm veriyi tek JSON dosyası olarak indirme / geri yükleme
 - **Denetim Kaydı** — bulutta kim ne zaman ne değiştirdi (bulut kurulunca aktif)
 
+## Sanal POS (kartla ödeme) — otomatik aktifleşir
+
+Kartla ödeme almak için bulut kurulumunun tamamlanmış olması gerekir. Sonrası çok basit:
+
+1. **iyzico** (önerilen) veya **PayTR** ile ücretsiz üye işyeri başvurusu yapın:
+   - iyzico: https://www.iyzico.com → başvuru onaylanınca panelden **Ayarlar → API Anahtarları**
+   - PayTR: https://www.paytr.com → mağaza panelinden **Bilgi** sayfası
+2. Admin panelinde **Sanal POS** modülünü açın, bilgileri yapıştırıp kaydedin.
+3. Bu kadar — mağazadaki ödeme adımına **"Kredi / Banka kartı (3D Secure)"** seçeneği
+   otomatik eklenir. Bilgiler buluta **AES-256 şifreli** kaydedilir, siteye giren kimse göremez.
+
+Notlar:
+- **Test modu** açıkken karttan tahsilat yapılmaz; sipariş "ödeme bekleniyor" olarak düşer.
+  Gerçek satışa geçerken Sanal POS → Genel ayarlar'dan test modunu kapatın.
+- PayTR kullanacaksanız PayTR paneline bildirim URL'si olarak şunu girin:
+  `WORKER-ADRESINIZ/api/payments/webhook/paytr`
+- Ödeme başarılı/başarısız dönüşü müşteriyi otomatik mağazaya geri getirir ve sipariş
+  durumu panelde "Ödendi" olur.
+
+## Cihazlar arası anlık eşitleme
+
+Site açık olan her cihaz buluttaki veri sürümünü **saniyede bir** yoklar; admin panelinde
+yapılan her değişiklik (ürün, stok, fiyat, ayar…) 1-2 saniye içinde tüm cihazlarda görünür.
+5 dakikadan uzun süre dokunulmayan sekmeler kotayı korumak için otomatik yavaşlar,
+kullanıcı sayfaya dönünce anında hızlanır. (`config.js` → `syncIntervalMs`)
+
 ## KVKK / Çerez uyumu
 
 - Siteye ilk girişte **çerez bildirimi** çıkar; tercih kaydedilir.

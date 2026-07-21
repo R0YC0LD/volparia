@@ -18,6 +18,9 @@ export default {
       if (url.pathname === "/api/reviews" && request.method === "GET") return listPublicReviews(env, url.searchParams.get("product") || "", cors);
       if (url.pathname === "/api/reviews" && request.method === "POST") return createReview(request, env, cors);
       if (url.pathname.startsWith("/api/images/") && request.method === "GET") return serveImage(env, decodeURIComponent(url.pathname.split("/").pop()));
+      if (url.pathname === "/api/payments/init" && request.method === "POST") return paymentInit(request, env, cors);
+      if (url.pathname === "/api/payments/callback/iyzico") return iyzicoCallback(request, env, url);
+      if (url.pathname === "/api/payments/webhook/paytr" && request.method === "POST") return paytrWebhook(request, env);
 
       // ---- yönetici ----
       const admin = await authorize(request, env);
@@ -39,6 +42,8 @@ export default {
       if (url.pathname === "/api/images" && request.method === "POST") return uploadImage(request, env, admin, cors);
       if (url.pathname.startsWith("/api/images/") && request.method === "DELETE") return deleteImage(env, admin, decodeURIComponent(url.pathname.split("/").pop()), cors);
       if (url.pathname === "/api/export" && request.method === "GET") return exportAll(env, cors);
+      if (url.pathname === "/api/pos/credentials" && request.method === "GET") return posCredentialStatus(env, cors);
+      if (url.pathname === "/api/pos/credentials" && request.method === "PUT") return savePosCredentials(request, env, admin, cors);
       return json({ error: "Endpoint bulunamadı" }, 404, cors);
     } catch (error) {
       console.error(error);
@@ -81,15 +86,20 @@ async function bumpVersion(env) {
 async function sync(env, cors) { return json({ v: await getVersion(env) }, 200, cors); }
 
 async function bootstrap(env, cors) {
-  const [products, settings, reviewStats, v] = await Promise.all([
+  const [products, settings, reviewStats, posRows, v] = await Promise.all([
     env.DB.prepare("SELECT * FROM products WHERE active = 1 ORDER BY created_at ASC").all(),
     env.DB.prepare("SELECT value FROM store_settings WHERE key='store'").first(),
     env.DB.prepare("SELECT product_id, COUNT(*) count, ROUND(AVG(rating),1) avg FROM reviews WHERE status='approved' GROUP BY product_id").all().catch(() => ({ results: [] })),
+    env.DB.prepare("SELECT provider FROM pos_credentials").all().catch(() => ({ results: [] })),
     getVersion(env)
   ]);
   const stats = Object.fromEntries(reviewStats.results.map(r => [r.product_id, { count: r.count, avg: r.avg }]));
-  return json({ products: products.results.map(rowToProduct), settings: safeJson(settings?.value, {}), reviewStats: stats, v }, 200, cors);
+  const parsedSettings = safeJson(settings?.value, {});
+  const activeProvider = parsedSettings.provider === "paytr" ? "paytr" : "iyzico";
+  const pos = { configured: posRows.results.some(r => r.provider === activeProvider), provider: activeProvider, testMode: Boolean(parsedSettings.testMode) };
+  return json({ products: products.results.map(rowToProduct), settings: parsedSettings, reviewStats: stats, pos, v }, 200, cors);
 }
+function storefrontUrl(env) { return (env.STOREFRONT_URL || "https://r0yc0ld.github.io/volparia/").replace(/\/?$/, "/"); }
 
 // ---- kimlik doğrulama ----
 async function login(request, env, cors) {
@@ -307,9 +317,10 @@ async function createOrder(request, env, cors) {
     if (result.coupon) { discount = result.coupon.discount; couponCode = result.coupon.code; }
   }
   const total = Math.max(0, gross - discount);
+  const method = ["card", "cod", "transfer"].includes(data.payment) ? data.payment : "transfer";
   const statements = [
     env.DB.prepare("INSERT INTO orders(id,order_no,customer_json,total,discount,coupon_code,status,payment_method,payment_status,shipping_address) VALUES(?,?,?,?,?,?,'new',?,'awaiting',?)")
-      .bind(data.id, String(data.orderNo).slice(0, 40), JSON.stringify(customer), total, discount, couponCode, data.payment === "cod" ? "cod" : "transfer", String(customer.address || "").slice(0, 500))
+      .bind(data.id, String(data.orderNo).slice(0, 40), JSON.stringify(customer), total, discount, couponCode, method, String(customer.address || "").slice(0, 500))
   ];
   normalized.forEach(i => statements.push(env.DB.prepare("INSERT INTO order_items(order_id,product_id,product_name,size,unit_price,quantity) VALUES(?,?,?,?,?,?)").bind(data.id, i.id, i.name, i.size, i.unitPrice, i.quantity)));
   touched.forEach(pid => statements.push(env.DB.prepare("UPDATE products SET sizes=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(JSON.stringify(products.get(pid).sizeList), pid)));
@@ -363,6 +374,9 @@ async function saveSettings(request, env, actor, cors) {
     criticalStockDefault: Math.max(1, Math.round(Number(data.criticalStockDefault) || 5)),
     categories: (Array.isArray(data.categories) ? data.categories : []).slice(0, 20).map(c => String(c).slice(0, 40)).filter(Boolean),
     bankTransfer: Boolean(data.bankTransfer), cashOnDelivery: Boolean(data.cashOnDelivery),
+    provider: data.provider === "paytr" ? "paytr" : "iyzico",
+    testMode: Boolean(data.testMode),
+    installments: (Array.isArray(data.installments) ? data.installments : []).filter(n => [2, 3, 6, 9, 12].includes(Number(n))).map(Number),
     supportEmail: String(data.supportEmail || "").slice(0, 120), supportPhone: String(data.supportPhone || "").slice(0, 40),
     bankName: String(data.bankName || "").slice(0, 80), accountHolder: String(data.accountHolder || "").slice(0, 80),
     iban: String(data.iban || "").slice(0, 40),
@@ -411,4 +425,184 @@ async function exportAll(env, cors) {
 
 async function audit(env, actor, action, type, id, metadata) {
   await env.DB.prepare("INSERT INTO audit_log(actor,action,entity_type,entity_id,metadata) VALUES(?,?,?,?,?)").bind(actor, action, type, id, JSON.stringify(metadata || {})).run();
+}
+
+/* ================= SANAL POS =================
+   Kimlik bilgileri D1'de AES-GCM ile şifreli tutulur; anahtar SESSION_SECRET'tan türetilir.
+   Panelden bilgiler kaydedilince kart ödemesi vitrinde otomatik aktifleşir. */
+async function hmacRawB64(value, secret) { const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]); const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(value)); return toBase64(new Uint8Array(sig)); }
+async function hmacHex(value, secret) { const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]); const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(value)); return [...new Uint8Array(sig)].map(b => b.toString(16).padStart(2, "0")).join(""); }
+async function posAesKey(env) { const digest = await crypto.subtle.digest("SHA-256", encoder.encode(`${env.SESSION_SECRET}|pos-credentials`)); return crypto.subtle.importKey("raw", digest, "AES-GCM", false, ["encrypt", "decrypt"]); }
+async function encryptCredentials(env, obj) { const iv = crypto.getRandomValues(new Uint8Array(12)); const key = await posAesKey(env); const data = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoder.encode(JSON.stringify(obj))); return JSON.stringify({ iv: toBase64(iv), data: toBase64(new Uint8Array(data)) }); }
+async function decryptCredentials(env, text) { try { const { iv, data } = JSON.parse(text); const key = await posAesKey(env); const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromBase64(iv) }, key, fromBase64(data)); return JSON.parse(new TextDecoder().decode(plain)); } catch { return null; } }
+async function getCredentials(env, provider) { const row = await env.DB.prepare("SELECT data FROM pos_credentials WHERE provider = ?").bind(provider).first(); return row ? decryptCredentials(env, row.data) : null; }
+const maskHint = value => value ? `••••${String(value).slice(-4)}` : null;
+
+async function savePosCredentials(request, env, actor, cors) {
+  const data = await body(request);
+  const provider = String(data.provider || "");
+  let clean = null;
+  if (provider === "iyzico") {
+    const apiKey = String(data.apiKey || "").trim(), secretKey = String(data.secretKey || "").trim();
+    if (!apiKey || !secretKey) return json({ error: "iyzico API anahtarı ve gizli anahtar zorunlu" }, 400, cors);
+    clean = { apiKey, secretKey, sandbox: Boolean(data.sandbox) };
+  } else if (provider === "paytr") {
+    const merchantId = String(data.merchantId || "").trim(), merchantKey = String(data.merchantKey || "").trim(), merchantSalt = String(data.merchantSalt || "").trim();
+    if (!merchantId || !merchantKey || !merchantSalt) return json({ error: "PayTR mağaza no, anahtar ve salt zorunlu" }, 400, cors);
+    clean = { merchantId, merchantKey, merchantSalt };
+  } else return json({ error: "Geçersiz sağlayıcı" }, 400, cors);
+  const encrypted = await encryptCredentials(env, clean);
+  await env.DB.prepare("INSERT INTO pos_credentials(provider,data,updated_at) VALUES(?,?,CURRENT_TIMESTAMP) ON CONFLICT(provider) DO UPDATE SET data=excluded.data,updated_at=CURRENT_TIMESTAMP").bind(provider, encrypted).run();
+  await bumpVersion(env);
+  await audit(env, actor, "pos.credentials.saved", "pos", provider, {});
+  return json({ ok: true }, 200, cors);
+}
+async function posCredentialStatus(env, cors) {
+  const rows = await env.DB.prepare("SELECT provider, data, updated_at FROM pos_credentials").all();
+  const status = {};
+  for (const row of rows.results) {
+    const creds = await decryptCredentials(env, row.data);
+    if (!creds) { status[row.provider] = { configured: false }; continue; }
+    if (row.provider === "iyzico") status[row.provider] = { configured: true, hint: maskHint(creds.apiKey), sandbox: Boolean(creds.sandbox), updatedAt: row.updated_at };
+    else if (row.provider === "paytr") status[row.provider] = { configured: true, hint: maskHint(creds.merchantId), updatedAt: row.updated_at };
+  }
+  return json({ pos: status }, 200, cors);
+}
+
+async function paymentInit(request, env, cors) {
+  const data = await body(request);
+  const order = await env.DB.prepare("SELECT * FROM orders WHERE id = ?").bind(String(data.orderId || "")).first();
+  if (!order) return json({ error: "Sipariş bulunamadı" }, 404, cors);
+  if (order.payment_status === "paid") return json({ error: "Sipariş zaten ödendi" }, 409, cors);
+  const settingsRow = await env.DB.prepare("SELECT value FROM store_settings WHERE key='store'").first();
+  const settings = safeJson(settingsRow?.value, {});
+  if (settings.testMode) return json({ mode: "test" }, 200, cors);
+  const provider = settings.provider === "paytr" ? "paytr" : "iyzico";
+  const creds = await getCredentials(env, provider);
+  if (!creds) return json({ error: "Ödeme sağlayıcısı henüz yapılandırılmadı. Yönetim panelinden Sanal POS bilgilerini girin.", mode: "unconfigured" }, 409, cors);
+  const customer = safeJson(order.customer_json, {});
+  const items = (await env.DB.prepare("SELECT product_id,product_name,unit_price,quantity FROM order_items WHERE order_id = ?").bind(order.id).all()).results;
+  const clientIp = request.headers.get("CF-Connecting-IP") || "85.34.78.112";
+  try {
+    if (provider === "iyzico") {
+      const result = await iyzicoInit(creds, order, customer, items, settings, request);
+      if (result.error) return json({ error: result.error }, 502, cors);
+      await env.DB.prepare("UPDATE orders SET payment_token=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(result.token, order.id).run();
+      await audit(env, "storefront", "payment.initialized", "order", order.id, { provider });
+      return json({ mode: "live", provider, paymentPageUrl: result.paymentPageUrl, token: result.token }, 200, cors);
+    }
+    const result = await paytrInit(env, creds, order, customer, items, clientIp);
+    if (result.error) return json({ error: result.error }, 502, cors);
+    await env.DB.prepare("UPDATE orders SET payment_token=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(result.merchantOid, order.id).run();
+    await audit(env, "storefront", "payment.initialized", "order", order.id, { provider });
+    return json({ mode: "live", provider, iframeUrl: result.iframeUrl }, 200, cors);
+  } catch (error) {
+    console.error("payment init", error);
+    return json({ error: "Ödeme sağlayıcısına ulaşılamadı, lütfen tekrar deneyin" }, 502, cors);
+  }
+}
+
+// ---- iyzico ----
+async function iyzicoAuthHeader(creds, uriPath, requestBody) {
+  const randomKey = `${Date.now()}${Math.floor(Math.random() * 1e6)}`;
+  const signature = await hmacHex(randomKey + uriPath + requestBody, creds.secretKey);
+  const authorization = `apiKey:${creds.apiKey}&randomKey:${randomKey}&signature:${signature}`;
+  return { header: `IYZWSv2 ${toBase64(encoder.encode(authorization))}`, randomKey };
+}
+async function iyzicoInit(creds, order, customer, items, settings, request) {
+  const base = creds.sandbox ? "https://sandbox-api.iyzipay.com" : "https://api.iyzipay.com";
+  const uriPath = "/payment/iyzipos/checkoutform/initialize/auth/ecom";
+  const price = Number(order.total).toFixed(1);
+  const callback = `${new URL(request.url).origin}/api/payments/callback/iyzico?order=${encodeURIComponent(order.id)}`;
+  // Sepet kalemleri iyzico'da toplam fiyata eşit olmalı: indirim orantılı dağıtılır, yuvarlama farkı son kaleme yazılır.
+  const gross = Math.max(1, Number(order.total) + Number(order.discount || 0));
+  let allocated = 0;
+  const basketItems = items.map((item, index) => {
+    const share = index === items.length - 1
+      ? Number((order.total - allocated).toFixed(2))
+      : Number((item.unit_price * item.quantity * order.total / gross).toFixed(2));
+    allocated = Number((allocated + share).toFixed(2));
+    return { id: item.product_id || "urun", name: item.product_name, category1: "Giyim", itemType: "PHYSICAL", price: share.toFixed(2) };
+  });
+  const payload = JSON.stringify({
+    locale: "tr", conversationId: order.id, price, paidPrice: price, currency: "TRY", basketId: order.order_no,
+    paymentGroup: "PRODUCT", callbackUrl: callback,
+    enabledInstallments: Array.isArray(settings.installments) && settings.installments.length ? settings.installments : [1],
+    buyer: { id: "guest", name: customer.firstName || "Misafir", surname: customer.lastName || "Müşteri", gsmNumber: customer.phone || "", email: customer.email || "", identityNumber: "11111111111", registrationAddress: order.shipping_address, ip: request.headers.get("CF-Connecting-IP") || "85.34.78.112", city: customer.city || "İstanbul", country: "Turkey" },
+    shippingAddress: { contactName: `${customer.firstName || ""} ${customer.lastName || ""}`.trim() || "Müşteri", city: customer.city || "İstanbul", country: "Turkey", address: order.shipping_address },
+    billingAddress: { contactName: `${customer.firstName || ""} ${customer.lastName || ""}`.trim() || "Müşteri", city: customer.city || "İstanbul", country: "Turkey", address: order.shipping_address },
+    basketItems
+  });
+  const { header } = await iyzicoAuthHeader(creds, uriPath, payload);
+  const response = await fetch(base + uriPath, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": header }, body: payload });
+  const result = await response.json().catch(() => ({}));
+  if (result.status !== "success") return { error: result.errorMessage || "iyzico ödeme başlatılamadı" };
+  return { token: result.token, paymentPageUrl: result.paymentPageUrl || null };
+}
+async function iyzicoRetrieve(creds, token, conversationId) {
+  const base = creds.sandbox ? "https://sandbox-api.iyzipay.com" : "https://api.iyzipay.com";
+  const uriPath = "/payment/iyzipos/checkoutform/auth/ecom/detail";
+  const payload = JSON.stringify({ locale: "tr", conversationId, token });
+  const { header } = await iyzicoAuthHeader(creds, uriPath, payload);
+  const response = await fetch(base + uriPath, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": header }, body: payload });
+  return response.json().catch(() => ({}));
+}
+async function iyzicoCallback(request, env, url) {
+  const orderId = url.searchParams.get("order") || "";
+  const store = storefrontUrl(env);
+  let token = "";
+  try { const form = await request.formData(); token = String(form.get("token") || ""); } catch { token = url.searchParams.get("token") || ""; }
+  const order = await env.DB.prepare("SELECT * FROM orders WHERE id = ?").bind(orderId).first();
+  if (!order || !token || order.payment_token !== token) return Response.redirect(`${store}?payment=fail&order=${encodeURIComponent(order?.order_no || "")}`, 302);
+  const creds = await getCredentials(env, "iyzico");
+  if (!creds) return Response.redirect(`${store}?payment=fail&order=${encodeURIComponent(order.order_no)}`, 302);
+  const result = await iyzicoRetrieve(creds, token, order.id);
+  const success = result.status === "success" && result.paymentStatus === "SUCCESS";
+  if (success) {
+    await env.DB.prepare("UPDATE orders SET payment_status='paid',updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(order.id).run();
+    await bumpVersion(env);
+    await audit(env, "iyzico", "payment.completed", "order", order.id, { orderNo: order.order_no });
+  } else await audit(env, "iyzico", "payment.failed", "order", order.id, { orderNo: order.order_no, detail: result.errorMessage || result.paymentStatus || "unknown" });
+  return Response.redirect(`${store}?payment=${success ? "success" : "fail"}&order=${encodeURIComponent(order.order_no)}`, 302);
+}
+
+// ---- PayTR ----
+async function paytrInit(env, creds, order, customer, items, clientIp) {
+  const merchantOid = order.order_no.replace(/[^A-Za-z0-9]/g, "");
+  const amount = String(Math.round(order.total * 100));
+  const basket = toBase64(encoder.encode(JSON.stringify(items.map(item => [item.product_name, String(item.unit_price), item.quantity]))));
+  const noInstallment = "0", maxInstallment = "0", currency = "TL", testMode = "0";
+  const hashStr = creds.merchantId + clientIp + merchantOid + (customer.email || "") + amount + basket + noInstallment + maxInstallment + currency + testMode;
+  const paytrToken = await hmacRawB64(hashStr + creds.merchantSalt, creds.merchantKey);
+  const store = storefrontUrl(env);
+  const form = new URLSearchParams({
+    merchant_id: creds.merchantId, user_ip: clientIp, merchant_oid: merchantOid, email: customer.email || "",
+    payment_amount: amount, paytr_token: paytrToken, user_basket: basket, debug_on: "0", no_installment: noInstallment,
+    max_installment: maxInstallment, user_name: `${customer.firstName || ""} ${customer.lastName || ""}`.trim() || "Müşteri",
+    user_address: order.shipping_address, user_phone: customer.phone || "", currency,
+    merchant_ok_url: `${store}?payment=success&order=${encodeURIComponent(order.order_no)}`,
+    merchant_fail_url: `${store}?payment=fail&order=${encodeURIComponent(order.order_no)}`,
+    timeout_limit: "30", test_mode: testMode
+  });
+  const response = await fetch("https://www.paytr.com/odeme/api/get-token", { method: "POST", body: form });
+  const result = await response.json().catch(() => ({}));
+  if (result.status !== "success") return { error: result.reason || "PayTR ödeme başlatılamadı" };
+  return { iframeUrl: `https://www.paytr.com/odeme/guvenli/${result.token}`, merchantOid };
+}
+async function paytrWebhook(request, env) {
+  const creds = await getCredentials(env, "paytr");
+  if (!creds) return new Response("OK");
+  const form = await request.formData();
+  const merchantOid = String(form.get("merchant_oid") || ""), status = String(form.get("status") || ""), totalAmount = String(form.get("total_amount") || ""), hash = String(form.get("hash") || "");
+  const expected = await hmacRawB64(merchantOid + creds.merchantSalt + status + totalAmount, creds.merchantKey);
+  if (!(await constantEqual(hash, expected))) return new Response("PAYTR notification failed: bad hash", { status: 400 });
+  const order = await env.DB.prepare("SELECT * FROM orders WHERE payment_token = ?").bind(merchantOid).first();
+  if (order) {
+    if (status === "success") {
+      await env.DB.prepare("UPDATE orders SET payment_status='paid',updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(order.id).run();
+      await bumpVersion(env);
+      await audit(env, "paytr", "payment.completed", "order", order.id, { orderNo: order.order_no });
+    } else await audit(env, "paytr", "payment.failed", "order", order.id, { orderNo: order.order_no });
+  }
+  return new Response("OK");
 }

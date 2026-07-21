@@ -9,6 +9,7 @@
     ["products", "Ürünler"],
     ["stock", "Stok / Bedenler"],
     ["orders", "Siparişler"],
+    ["pos", "Sanal POS"],
     ["coupons", "Kuponlar"],
     ["reviews", "Yorumlar"],
     ["customers", "Müşteriler"],
@@ -50,14 +51,15 @@
   async function loadAdminData() {
     if (!state.apiOnline || !state.token) { renderAdmin(); return; }
     try {
-      const [prods, orders, coupons, reviews, subs] = await Promise.all([
-        api("/api/products/full"), api("/api/orders"), api("/api/coupons"), api("/api/reviews/all"), api("/api/newsletter")
+      const [prods, orders, coupons, reviews, subs, pos] = await Promise.all([
+        api("/api/products/full"), api("/api/orders"), api("/api/coupons"), api("/api/reviews/all"), api("/api/newsletter"), api("/api/pos/credentials").catch(() => ({ pos: {} }))
       ]);
       state.admin.products = prods.products || [];
       state.admin.orders = orders.orders || [];
       state.admin.coupons = coupons.coupons || [];
       state.admin.reviews = reviews.reviews || [];
       state.admin.subscribers = subs.subscribers || [];
+      state.admin.pos = pos.pos || {};
       renderAdmin();
     } catch (err) { if (!handleSessionExpiry(err)) toast(err.message, false); }
   }
@@ -84,7 +86,7 @@
     const host = $("#adminContent");
     const views = {
       dashboard: dashboardHtml, products: productsHtml, stock: stockHtml, orders: ordersHtml,
-      coupons: couponsHtml, reviews: reviewsHtml, customers: customersHtml, categories: categoriesHtml,
+      pos: posHtml, coupons: couponsHtml, reviews: reviewsHtml, customers: customersHtml, categories: categoriesHtml,
       content: contentHtml, newsletter: newsletterHtml, seo: seoHtml, settings: settingsHtml,
       backups: backupsHtml, audit: auditHtml
     };
@@ -255,6 +257,44 @@
     </div>`;
   }
   function productName(id) { const p = state.products.find(x => x.id === id); return p ? p.name : "Ürün"; }
+
+  /* ---------- sanal pos ---------- */
+  function posHtml() {
+    if (!state.apiOnline) return `<div class="admin-panel"><div class="empty">Sanal POS, bulut (Cloudflare) kurulumu tamamlandıktan sonra kullanılabilir.<br>Kurulum adımları için KURULUM.md dosyasına bakın — bilgiler girildiği anda kart ödemesi vitrinde otomatik açılır.</div></div>`;
+    const s = state.settings;
+    const pos = state.admin.pos || {};
+    const iyz = pos.iyzico, ptr = pos.paytr;
+    const statusPill = st => st?.configured ? `<span class="pill ok">Yapılandırıldı · ${esc(st.hint || "")}${st.sandbox ? " · sandbox" : ""}</span>` : `<span class="pill dim">Henüz girilmedi</span>`;
+    return `<div class="admin-panel"><h3>Genel POS ayarları</h3>
+      <p class="form-note" style="margin-bottom:14px">Aktif sağlayıcının bilgileri girildiği anda mağazadaki ödeme adımına <b>"Kredi / Banka kartı"</b> seçeneği otomatik eklenir. Test modu açıkken karttan tahsilat yapılmaz.</p>
+      <form id="posGeneralForm" class="form-grid">
+        <label class="field">Aktif sağlayıcı<select name="provider"><option value="iyzico" ${s.provider !== "paytr" ? "selected" : ""}>iyzico</option><option value="paytr" ${s.provider === "paytr" ? "selected" : ""}>PayTR</option></select></label>
+        <div class="field"><span>Test modu</span><label class="check-row" style="margin-top:10px"><input type="checkbox" name="testMode" ${s.testMode ? "checked" : ""}>Açık (tahsilat yapılmaz)</label></div>
+        <div class="field full"><span>Taksit seçenekleri (iyzico)</span><div style="display:flex;gap:16px;margin-top:6px;flex-wrap:wrap">
+          ${[2, 3, 6, 9, 12].map(n => `<label class="check-row"><input type="checkbox" name="inst${n}" ${(s.installments || []).includes(n) ? "checked" : ""}>${n} taksit</label>`).join("")}
+        </div></div>
+        <div class="admin-form-actions"><button type="submit" class="button dark">Genel ayarları kaydet</button></div>
+      </form>
+    </div>
+    <div class="admin-panel"><h3>iyzico bilgileri ${statusPill(iyz)}</h3>
+      <p class="form-note" style="margin-bottom:12px">iyzico hesabınızın <b>Ayarlar → API Anahtarları</b> bölümünden alınır (iyzico.com üzerinden ücretsiz başvuru).</p>
+      <form id="posIyzicoForm" class="form-grid">
+        <label class="field">API Anahtarı (apiKey)<input name="apiKey" required autocomplete="off" placeholder="sandbox-... veya canlı anahtar"></label>
+        <label class="field">Gizli Anahtar (secretKey)<input name="secretKey" type="password" required autocomplete="off"></label>
+        <div class="field"><label class="check-row" style="margin-top:24px"><input type="checkbox" name="sandbox">Sandbox (test ortamı) anahtarı</label></div>
+        <div class="admin-form-actions"><button type="submit" class="button dark">iyzico bilgilerini kaydet</button></div>
+      </form>
+    </div>
+    <div class="admin-panel"><h3>PayTR bilgileri ${statusPill(ptr)}</h3>
+      <p class="form-note" style="margin-bottom:12px">PayTR mağaza panelinizin <b>Bilgi</b> sayfasından alınır. Ayrıca PayTR paneline bildirim adresi olarak şunu girin: <code style="font-size:11px">${esc((CONFIG.apiBase || "").replace(/\/$/, ""))}/api/payments/webhook/paytr</code></p>
+      <form id="posPaytrForm" class="form-grid">
+        <label class="field">Mağaza No (merchantId)<input name="merchantId" required autocomplete="off"></label>
+        <label class="field">Mağaza Parola (merchantKey)<input name="merchantKey" type="password" required autocomplete="off"></label>
+        <label class="field">Mağaza Gizli Anahtar (merchantSalt)<input name="merchantSalt" type="password" required autocomplete="off"></label>
+        <div class="admin-form-actions"><button type="submit" class="button dark">PayTR bilgilerini kaydet</button></div>
+      </form>
+    </div>`;
+  }
 
   /* ---------- 5. kuponlar ---------- */
   function couponsHtml() {
@@ -672,6 +712,33 @@
         usageLimit: fd.get("usageLimit") ? Math.max(1, Number(fd.get("usageLimit"))) : null,
         active: Boolean(fd.get("active"))
       });
+    };
+    const posG = $("#posGeneralForm"); if (posG) posG.onsubmit = async e => {
+      e.preventDefault();
+      const fd = new FormData(posG);
+      const ok = await saveSettingsPartial({
+        provider: fd.get("provider") === "paytr" ? "paytr" : "iyzico",
+        testMode: Boolean(fd.get("testMode")),
+        installments: [2, 3, 6, 9, 12].filter(n => fd.get(`inst${n}`))
+      });
+      if (ok) { await bootstrapData(); renderAdmin(); toast("POS genel ayarları kaydedildi"); }
+    };
+    const savePosCreds = async payload => {
+      try { await api("/api/pos/credentials", { method: "PUT", body: JSON.stringify(payload) }); }
+      catch (err) { if (!handleSessionExpiry(err)) toast(err.message, false); return false; }
+      await bootstrapData(); await loadAdminData();
+      toast("POS bilgileri şifrelenerek kaydedildi — kart ödemesi aktif");
+      return true;
+    };
+    const posI = $("#posIyzicoForm"); if (posI) posI.onsubmit = e => {
+      e.preventDefault();
+      const fd = new FormData(posI);
+      savePosCreds({ provider: "iyzico", apiKey: String(fd.get("apiKey")).trim(), secretKey: String(fd.get("secretKey")).trim(), sandbox: Boolean(fd.get("sandbox")) });
+    };
+    const posP = $("#posPaytrForm"); if (posP) posP.onsubmit = e => {
+      e.preventDefault();
+      const fd = new FormData(posP);
+      savePosCreds({ provider: "paytr", merchantId: String(fd.get("merchantId")).trim(), merchantKey: String(fd.get("merchantKey")).trim(), merchantSalt: String(fd.get("merchantSalt")).trim() });
     };
     const contentSel = $("#contentPageSelect"); if (contentSel) contentSel.onchange = () => { state.admin.contentKey = contentSel.value; renderAdmin(); };
     const contentF = $("#contentForm"); if (contentF) contentF.onsubmit = async e => {
