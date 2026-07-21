@@ -1,7 +1,7 @@
 /* ============ LINEA — minimal & asil giyim mağazası ============ */
 :root{
-  --bg:#f6f4f0; --surface:#ffffff; --ink:#16130f; --ink-soft:#4c463e; --muted:#8d857a;
-  --line:#e5e0d7; --accent:#9a7b4f; --accent-soft:#f0e7da;
+  --bg:#f9f4ed; --surface:#fffdf9; --ink:#221610; --ink-soft:#544437; --muted:#94816f;
+  --line:#eadfd0; --accent:#c2622f; --accent-soft:#f8e7d8;
   --danger:#c8372d; --flame1:#ff6a00; --flame2:#e03131; --ok:#22764a;
   --radius:14px; --shadow:0 18px 50px -22px rgba(22,19,15,.22);
   --serif:"Fraunces",Georgia,serif; --sans:"Manrope",system-ui,sans-serif;
@@ -24,9 +24,9 @@ body.locked{overflow:hidden}
 
 /* buttons */
 .button{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:13px;padding:13px 22px;border-radius:999px;transition:.2s;letter-spacing:.2px}
-.button.dark{background:var(--ink);color:#f6f2ea}
-.button.dark:hover{background:#2c261e;transform:translateY(-1px)}
-.button.light{background:#f6f2ea;color:var(--ink)}
+.button.dark{background:var(--ink);color:#faf3e9}
+.button.dark:hover{background:#33241a;transform:translateY(-1px)}
+.button.light{background:#faf3e9;color:var(--ink)}
 .button.light:hover{background:#fff}
 .button.outline{border:1px solid var(--line);background:var(--surface)}
 .button.outline:hover{border-color:var(--ink)}
@@ -39,7 +39,7 @@ body.locked{overflow:hidden}
 
 /* ---------- header ---------- */
 .announcement{background:var(--ink);color:#efe9df;text-align:center;font-size:11.5px;font-weight:600;letter-spacing:.4px;padding:9px 14px}
-.site-header{position:sticky;top:0;z-index:60;background:rgba(246,244,240,.92);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.site-header{position:sticky;top:0;z-index:60;background:rgba(249,244,237,.92);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
 .header-main{display:flex;align-items:center;gap:18px;padding:14px 0}
 .mobile-menu{display:none;font-size:20px}
 .brand{display:flex;align-items:center;gap:10px}
@@ -50,7 +50,7 @@ body.locked{overflow:hidden}
 .login-brand,.admin-logo,.footer-brand{display:flex;align-items:center;gap:10px}
 .login-brand .brand-mark svg,.footer-brand .brand-mark svg{width:25px;height:25px}
 .admin-logo .brand-mark svg{width:22px;height:22px}
-.admin-logo .brand-mark,.footer-brand .brand-mark{color:#cbb289}
+.admin-logo .brand-mark,.footer-brand .brand-mark{color:#dd9a63}
 .admin-logo{flex-wrap:wrap}
 .admin-logo small{flex-basis:100%}
 .search-trigger{flex:1;max-width:430px;margin-left:auto;display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:10px 18px;color:var(--muted);font-size:13px;transition:.2s}
@@ -79,9 +79,9 @@ body.locked{overflow:hidden}
 .proof b{font-size:13px;display:block}
 .proof small{color:var(--muted);font-size:11.5px}
 .hero-art{display:grid;place-items:center}
-.hero-panel{position:relative;width:min(360px,100%);aspect-ratio:3/4;border-radius:200px 200px var(--radius) var(--radius);background:linear-gradient(160deg,#e9e2d6,#d9cfbf 55%,#c4b49c);box-shadow:var(--shadow);overflow:hidden;display:grid;place-items:center}
-.hero-panel i{font-family:var(--serif);font-style:normal;font-size:44px;letter-spacing:14px;color:rgba(22,19,15,.18);transform:rotate(90deg)}
-.hero-panel span{position:absolute;inset:18px;border:1px solid rgba(22,19,15,.14);border-radius:184px 184px 8px 8px}
+.hero-panel{position:relative;width:min(360px,100%);aspect-ratio:3/4;border-radius:200px 200px var(--radius) var(--radius);background:linear-gradient(160deg,#f5e3cd,#eec9a0 55%,#d99a62);box-shadow:var(--shadow);overflow:hidden;display:grid;place-items:center}
+.hero-panel i{font-family:var(--serif);font-style:normal;font-size:44px;letter-spacing:14px;color:rgba(120,62,26,.2);transform:rotate(90deg)}
+.hero-panel span{position:absolute;inset:18px;border:1px solid rgba(120,62,26,.22);border-radius:184px 184px 8px 8px}
 
 /* ---------- trust ---------- */
 .trust{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding-bottom:56px}
@@ -155,7 +155,7 @@ body.locked{overflow:hidden}
 .statement{padding:30px 0 70px}
 .statement-inner{background:var(--ink);color:#efe9df;border-radius:calc(var(--radius) + 8px);padding:64px min(8vw,90px);text-align:center}
 .statement-inner h2{font-size:clamp(28px,4vw,46px);margin:16px 0 14px}
-.statement-inner h2 em{display:block;font-style:italic;color:#cbb289}
+.statement-inner h2 em{display:block;font-style:italic;color:#dd9a63}
 .statement-inner p{max-width:560px;margin-inline:auto;color:#b7ad9e;font-size:14.5px}
 .newsletter{padding:0 0 70px}
 .newsletter-inner{background:var(--accent-soft);border-radius:calc(var(--radius) + 8px);padding:46px min(6vw,64px);display:grid;grid-template-columns:1fr 1fr;gap:30px;align-items:center}
@@ -174,14 +174,14 @@ body.locked{overflow:hidden}
 .assurance-item small{font-size:10.5px;color:var(--muted)}
 .pay-badges{margin-left:auto;display:flex;gap:8px}
 .pay-badges span{font-size:10.5px;font-weight:800;border:1px solid var(--line);border-radius:8px;padding:6px 12px;color:var(--ink-soft)}
-footer{background:var(--ink);color:#cfc7ba}
+footer{background:var(--ink);color:#d9c8b6}
 .footer-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:34px;padding:52px 0 34px}
-.footer-brand{font-family:var(--serif);font-size:25px;letter-spacing:5px;color:#f2ede4;margin-bottom:12px}
+.footer-brand{font-family:var(--serif);font-size:25px;letter-spacing:5px;color:#f6ede2;margin-bottom:12px}
 .footer-grid p{font-size:12.5px;max-width:280px}
-.footer-grid b{display:block;color:#f2ede4;font-size:12px;letter-spacing:1.5px;margin-bottom:13px}
-.footer-grid a,.footer-grid button{display:block;font-size:13px;color:#a89f92;padding:4px 0;text-align:left;transition:.15s}
+.footer-grid b{display:block;color:#f6ede2;font-size:12px;letter-spacing:1.5px;margin-bottom:13px}
+.footer-grid a,.footer-grid button{display:block;font-size:13px;color:#b39c88;padding:4px 0;text-align:left;transition:.15s}
 .footer-grid a:hover,.footer-grid button:hover{color:#fff}
-.footer-bottom{display:flex;justify-content:space-between;gap:14px;border-top:1px solid #2c2820;padding:18px 0;font-size:11.5px;color:#8d8577}
+.footer-bottom{display:flex;justify-content:space-between;gap:14px;border-top:1px solid #33261a;padding:18px 0;font-size:11.5px;color:#9b8271}
 
 /* ---------- overlay / drawers / modals ---------- */
 .overlay{position:fixed;inset:0;background:rgba(22,19,15,.45);opacity:0;pointer-events:none;transition:.25s;z-index:80}
@@ -291,7 +291,7 @@ footer{background:var(--ink);color:#cfc7ba}
 /* ---------- admin login ---------- */
 .login-screen{position:fixed;inset:0;z-index:110;background:var(--ink);display:none;place-items:center;padding:5vh 5vw}
 .login-screen.show{display:grid}
-.login-screen .round-close{position:absolute;top:26px;right:26px;background:transparent;color:#cfc7ba;border-color:#3a342b}
+.login-screen .round-close{position:absolute;top:26px;right:26px;background:transparent;color:#d9c8b6;border-color:#453324}
 .login-card{width:min(400px,100%);background:var(--bg);border-radius:calc(var(--radius) + 6px);padding:38px 34px;display:flex;flex-direction:column;gap:13px}
 .login-brand{font-family:var(--serif);font-size:26px;letter-spacing:6px}
 .login-card h1{font-size:26px}
@@ -304,21 +304,21 @@ footer{background:var(--ink);color:#cfc7ba}
 /* ---------- admin app ---------- */
 .admin-app{position:fixed;inset:0;z-index:100;background:var(--bg);display:none;grid-template-columns:250px 1fr}
 .admin-app.show{display:grid}
-.admin-sidebar{background:var(--ink);color:#cfc7ba;display:flex;flex-direction:column;padding:26px 18px;gap:20px;overflow-y:auto}
-.admin-logo{font-family:var(--serif);font-size:23px;letter-spacing:5px;color:#f2ede4;padding:0 8px}
-.admin-logo small{display:block;font-family:var(--sans);font-size:8.5px;letter-spacing:3px;color:#8d8577;margin-top:4px}
+.admin-sidebar{background:var(--ink);color:#d9c8b6;display:flex;flex-direction:column;padding:26px 18px;gap:20px;overflow-y:auto}
+.admin-logo{font-family:var(--serif);font-size:23px;letter-spacing:5px;color:#f6ede2;padding:0 8px}
+.admin-logo small{display:block;font-family:var(--sans);font-size:8.5px;letter-spacing:3px;color:#9b8271;margin-top:4px}
 #adminNav{display:flex;flex-direction:column;gap:3px;flex:1}
-#adminNav button{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:11px;font-size:13px;font-weight:600;color:#a89f92;text-align:left;transition:.15s}
-#adminNav button:hover{background:#241f18;color:#fff}
-#adminNav button.active{background:#2c261e;color:#fff}
+#adminNav button{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:11px;font-size:13px;font-weight:600;color:#b39c88;text-align:left;transition:.15s}
+#adminNav button:hover{background:#2a1e14;color:#fff}
+#adminNav button.active{background:#33241a;color:#fff}
 #adminNav button i{font-style:normal;font-size:15px;width:19px;text-align:center}
 #adminNav button b{margin-left:auto;background:var(--danger);color:#fff;font-size:9.5px;min-width:18px;height:18px;border-radius:99px;display:grid;place-items:center;padding-inline:5px}
-.storage-state{display:flex;align-items:center;gap:10px;background:#241f18;border-radius:12px;padding:12px 13px}
-.storage-state i{width:9px;height:9px;border-radius:50%;background:#8d8577;flex-shrink:0}
+.storage-state{display:flex;align-items:center;gap:10px;background:#2a1e14;border-radius:12px;padding:12px 13px}
+.storage-state i{width:9px;height:9px;border-radius:50%;background:#9b8271;flex-shrink:0}
 .storage-state i.online{background:#4ade80;box-shadow:0 0 0 4px rgba(74,222,128,.15)}
-.storage-state b{font-size:11.5px;color:#f2ede4;display:block}
-.storage-state small{font-size:10px;color:#8d8577}
-.admin-exit{border:1px solid #3a342b;border-radius:11px;padding:11px;font-size:12.5px;font-weight:700;color:#cfc7ba;transition:.15s}
+.storage-state b{font-size:11.5px;color:#f6ede2;display:block}
+.storage-state small{font-size:10px;color:#9b8271}
+.admin-exit{border:1px solid #453324;border-radius:11px;padding:11px;font-size:12.5px;font-weight:700;color:#d9c8b6;transition:.15s}
 .admin-exit:hover{background:#c8372d;border-color:#c8372d;color:#fff}
 .admin-main{overflow-y:auto;padding:30px min(3.4vw,42px) 60px}
 .admin-top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:26px}
@@ -391,15 +391,15 @@ svg{display:block}
 #adminNav button i{display:grid;place-items:center}
 #adminNav button i svg{width:16px;height:16px}
 .line-art svg{width:26px;height:26px}
-select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2316130f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:14px;padding-right:34px}
+select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23221610' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:14px;padding-right:34px}
 
 /* ---------- tilki logosu ---------- */
 .brand-mark svg,.hero-fox svg,.statement-fox svg{display:block}
 .hero-fox{position:relative;z-index:1;transform:none !important;width:100%}
-.hero-fox svg{width:min(220px,60%);height:auto;margin:auto;color:rgba(22,19,15,.72)}
+.hero-fox svg{width:min(220px,60%);height:auto;margin:auto;color:#8a4a20}
 .hero-panel{display:grid;place-items:center}
 .statement-fox{display:block;margin:0 auto 10px}
-.statement-fox svg{width:56px;height:56px;color:#cbb289;margin:auto}
+.statement-fox svg{width:56px;height:56px;color:#dd9a63;margin:auto}
 
 /* ---------- kategori çipleri ---------- */
 .category-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
@@ -450,8 +450,8 @@ select{appearance:none;-webkit-appearance:none;background-image:url("data:image/
 
 /* ---------- footer sosyal ---------- */
 .footer-social{display:flex;gap:9px;margin-top:14px}
-.footer-social a{width:36px;height:36px;border-radius:50%;border:1px solid #3a342b;display:grid;place-items:center;color:#a89f92;transition:.15s}
-.footer-social a:hover{border-color:#f2ede4;color:#f2ede4}
+.footer-social a{width:36px;height:36px;border-radius:50%;border:1px solid #453324;display:grid;place-items:center;color:#b39c88;transition:.15s}
+.footer-social a:hover{border-color:#f6ede2;color:#f6ede2}
 .footer-social svg{width:17px;height:17px}
 
 /* ---------- admin ek bileşenler ---------- */

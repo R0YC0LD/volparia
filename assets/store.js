@@ -7,7 +7,7 @@
 
   /* ---------- render ---------- */
   function renderGenders() {
-    const tones = { kadin: ["#ead9d3", "#d9c2b8"], erkek: ["#d9dee2", "#bcc7cd"], unisex: ["#e6e0d2", "#cfc5ae"], cocuk: ["#dbe7e0", "#bcd3c6"] };
+    const tones = { kadin: ["#f0d8ca", "#ddb49c"], erkek: ["#e4d8c6", "#bfa585"], unisex: ["#eee0c9", "#d7bd93"], cocuk: ["#f4ddc0", "#e5b586"] };
     const copy = { kadin: "Zarafetin günlük hali", erkek: "Net çizgiler, rahat duruş", unisex: "Herkese ait parçalar", cocuk: "Konforlu ve dayanıklı" };
     $("#genderGrid").innerHTML = Object.entries(GENDERS).map(([key, label], i) => {
       const count = state.products.filter(p => p.active !== false && p.gender === key).length;
