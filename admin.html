@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>VOLPARIA — Yönetim Paneli</title>
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2314120f'/%3E%3Cg transform='translate(4 4) scale(.56)' fill='%23f2ede4'%3E%3Cpath d='M44 10 C45 13.5 46.3 16 48.5 18 L50.5 17.5 L53 9 C55.5 11.5 57 14 58 17 C61.5 18.5 64.5 21 67 24.5 L69.5 27.5 C65 30 60.5 30.3 56 28.8 C52 32.5 49.3 37 47.8 42 C46.6 46.5 46.6 51 48 56 C44.5 52.5 42.8 48 42.3 42.8 L39.8 41.8 L42.4 39.6 C42 34 42.6 28 43.2 22 L40.8 21 L43.4 19 C43.3 15.8 43.6 12.8 44 10 Z'/%3E%3Cpath d='M57.5 31.5 C64 37 67.5 43.5 67.5 50.5 C67.5 58 63.5 65 56.5 70 C50 74.5 42.5 76.5 35 75.8 C27.8 75.1 21.5 72.4 16.5 67.8 C14.3 69.6 12.7 71.9 11.7 74.5 C15 74.8 18.2 74.1 21.2 72.7 C19.6 76.6 17.4 79.6 14.5 82 C20.8 83.4 27 82.8 33 80.5 C41.5 77.2 48.5 72 53.8 65 C55.8 60.5 56 54.5 55.6 48.5 C55.2 42 55.8 36 57.5 31.5 Z'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/site.css?v=2">
+  <script src="config.js?v=2"></script>
+  <script src="assets/common.js?v=2" defer></script>
+  <script src="assets/admin.js?v=2" defer></script>
+</head>
+<body class="admin-body">
+
+  <section class="login-screen show" id="adminLogin" aria-label="Yönetici girişi">
+    <a class="round-close" id="closeLogin" href="index.html" aria-label="Mağazaya dön">×</a>
+    <form id="loginForm" class="login-card">
+      <div class="login-brand"><i class="brand-mark" data-fox></i>VOLPARIA</div>
+      <span class="eyebrow">YÖNETİM PANELİ</span>
+      <h1>Yönetici girişi</h1>
+      <p>Mağaza yönetimine devam etmek için bilgilerinizi girin.</p>
+      <label>Kullanıcı adı<input id="adminUsername" autocomplete="username" required></label>
+      <label>Şifre<div class="password-field"><input id="adminPassword" type="password" autocomplete="current-password" required><button type="button" id="showPassword">Göster</button></div></label>
+      <button class="button dark full" type="submit">Giriş yap →</button>
+      <small id="loginMessage">Güvenli yönetim oturumu</small>
+    </form>
+  </section>
+
+  <section class="admin-app" id="adminApp">
+    <aside class="admin-sidebar">
+      <div class="admin-logo"><i class="brand-mark" data-fox></i>VOLPARIA<small>YÖNETİM PANELİ</small></div>
+      <nav id="adminNav"></nav>
+      <div class="storage-state"><i id="storageDot"></i><span><b id="storageLabel">Veri katmanı</b><small id="storageDetail">Bağlantı kontrol ediliyor</small></span></div>
+      <button class="admin-exit" id="adminLogout">Çıkış yap</button>
+    </aside>
+    <main class="admin-main">
+      <header class="admin-top">
+        <div><span class="eyebrow">VOLPARIA YÖNETİM</span><h1 id="adminTitle">Genel Bakış</h1></div>
+        <div><a class="button outline" href="index.html" target="_blank" rel="noopener">Mağazayı görüntüle ↗</a></div>
+      </header>
+      <div id="adminContent"></div>
+    </main>
+  </section>
+
+  <div class="toast" id="toast" role="status"></div>
+  <noscript>Yönetim panelini kullanmak için JavaScript'i etkinleştirin.</noscript>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>VOLPARIA — Sade Giyin, Asil Kal</title>
+  <meta name="description" content="Her cinsiyete ve her bedene uygun, özenle seçilmiş zamansız parçalar. Minimal ve asil giyim mağazası.">
+  <meta name="theme-color" content="#14120f">
+  <meta property="og:title" content="VOLPARIA — Sade Giyin, Asil Kal">
+  <meta property="og:description" content="Her cinsiyete ve her bedene uygun, özenle seçilmiş zamansız parçalar.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="VOLPARIA">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2314120f'/%3E%3Cg transform='translate(4 4) scale(.56)' fill='%23f2ede4'%3E%3Cpath d='M44 10 C45 13.5 46.3 16 48.5 18 L50.5 17.5 L53 9 C55.5 11.5 57 14 58 17 C61.5 18.5 64.5 21 67 24.5 L69.5 27.5 C65 30 60.5 30.3 56 28.8 C52 32.5 49.3 37 47.8 42 C46.6 46.5 46.6 51 48 56 C44.5 52.5 42.8 48 42.3 42.8 L39.8 41.8 L42.4 39.6 C42 34 42.6 28 43.2 22 L40.8 21 L43.4 19 C43.3 15.8 43.6 12.8 44 10 Z'/%3E%3Cpath d='M57.5 31.5 C64 37 67.5 43.5 67.5 50.5 C67.5 58 63.5 65 56.5 70 C50 74.5 42.5 76.5 35 75.8 C27.8 75.1 21.5 72.4 16.5 67.8 C14.3 69.6 12.7 71.9 11.7 74.5 C15 74.8 18.2 74.1 21.2 72.7 C19.6 76.6 17.4 79.6 14.5 82 C20.8 83.4 27 82.8 33 80.5 C41.5 77.2 48.5 72 53.8 65 C55.8 60.5 56 54.5 55.6 48.5 C55.2 42 55.8 36 57.5 31.5 Z'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/site.css?v=2">
+  <script src="config.js?v=2"></script>
+  <script src="assets/common.js?v=2" defer></script>
+  <script src="assets/store.js?v=2" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">İçeriğe geç</a>
+
+  <div id="storeView">
+    <div class="announcement" id="announcement">₺2.000 ve üzeri alışverişlerde kargo bizden · 15.00'e kadar aynı gün gönderim</div>
+
+    <header class="site-header">
+      <div class="header-main shell">
+        <button class="mobile-menu" id="mobileMenu" aria-label="Menüyü aç"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        <button class="brand" id="secretLogo" aria-label="VOLPARIA ana sayfa">
+          <i class="brand-mark" data-fox></i>
+          <span>VOLPARIA</span><small>GİYİM MAĞAZASI</small>
+        </button>
+        <button class="search-trigger" id="searchTrigger" aria-label="Aramayı aç"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.8-3.8"/></svg></span><b>Ürün adı veya ürün kodu ara…</b><kbd>Ctrl K</kbd></button>
+        <nav class="header-actions" aria-label="Hızlı işlemler">
+          <button id="searchMobile" aria-label="Ara"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.8-3.8"/></svg></button>
+          <button id="favoritesButton" aria-label="Favoriler"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.5C7.5 17.2 3 13.6 3 9.3 3 6.4 5.2 4.5 7.7 4.5c1.8 0 3.3 1 4.3 2.6 1-1.6 2.5-2.6 4.3-2.6 2.5 0 4.7 1.9 4.7 4.8 0 4.3-4.5 7.9-9 11.2z"/></svg><b id="favoriteCount">0</b></button>
+          <button id="cartButton" aria-label="Sepeti aç"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 8h13l-.9 12.1a1.5 1.5 0 0 1-1.5 1.4H7.9a1.5 1.5 0 0 1-1.5-1.4L5.5 8z"/><path d="M8.8 11V6.2a3.2 3.2 0 0 1 6.4 0V11"/></svg><b id="cartCount">0</b></button>
+        </nav>
+      </div>
+      <nav class="category-nav shell" id="categoryNav" aria-label="Koleksiyonlar">
+        <a href="#products" data-gender-link="">Tümü</a>
+        <a href="#products" data-gender-link="kadin">Kadın</a>
+        <a href="#products" data-gender-link="erkek">Erkek</a>
+        <a href="#products" data-gender-link="unisex">Unisex</a>
+        <a href="#products" data-gender-link="cocuk">Çocuk</a>
+        <a href="#products" data-filter-link="new">Yeni Gelenler</a>
+        <a class="sale-link" href="#products" data-filter-link="sale">İndirim</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero" id="hero">
+        <div class="hero-inner shell">
+          <div class="hero-copy">
+            <span class="eyebrow" id="heroEyebrow">SEZONUN ZAMANSIZ PARÇALARI</span>
+            <h1 id="heroTitle">Sade giyin.<em>Asil kal.</em></h1>
+            <p id="heroCopy">Her cinsiyete ve her bedene uygun, özenle seçilmiş koleksiyon. Kaliteli kumaş, dürüst işçilik, zamansız kesim.</p>
+            <div class="hero-actions">
+              <a class="button dark" href="#products">Koleksiyonu keşfet →</a>
+              <a class="link-button" href="#genders">Kategorilere göz at ↗</a>
+            </div>
+            <div class="proof"><p><b>Her bedene uygun</b><small>XS'ten 3XL'e gerçek beden stoğu</small></p></div>
+          </div>
+          <div class="hero-art" aria-hidden="true">
+            <div class="hero-panel"><i class="hero-fox" data-fox></i><span></span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="trust shell" aria-label="Alışveriş avantajları">
+        <article><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M7 3h10l4 6-9 12L3 9l4-6z"/><path d="M3 9h18M9.5 9 12 21 14.5 9M7 3l2.5 6L12 3l2.5 6L17 3"/></svg></i><div><b>Kaliteli kumaş</b><small>Seçilmiş tedarikçiler</small></div></article>
+        <article><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h11v10H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="18.5" r="1.8"/><circle cx="17" cy="18.5" r="1.8"/></svg></i><div><b>Hızlı gönderim</b><small>15.00'e kadar aynı gün</small></div></article>
+        <article><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h9.5a6.5 6.5 0 0 1 0 13H8"/></svg></i><div><b>Kolay iade</b><small>14 gün içinde</small></div></article>
+        <article><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6a2 2 0 1 1 2-2"/><path d="M12 6l-9 7.5a1.4 1.4 0 0 0 .9 2.5h16.2a1.4 1.4 0 0 0 .9-2.5L12 6z"/></svg></i><div><b>Beden garantisi</b><small>Uymayan bedende ücretsiz değişim</small></div></article>
+      </section>
+
+      <section class="section shell" id="genders">
+        <header class="section-head"><div><span class="eyebrow">HERKES İÇİN</span><h2>Kendine ait olanı bul</h2></div><button class="link-button" data-show-all>Tüm ürünler →</button></header>
+        <div class="gender-grid" id="genderGrid"></div>
+      </section>
+
+      <section class="section products-section" id="products">
+        <div class="shell">
+          <header class="section-head product-head">
+            <div><span class="eyebrow" id="productsEyebrow">KOLEKSİYON</span><h2 id="productsTitle">Öne çıkanlar</h2></div>
+            <div class="product-tabs">
+              <button class="active" data-filter="all">Tümü</button>
+              <button data-filter="new">Yeni</button>
+              <button data-filter="sale">İndirim</button>
+              <button data-filter="bestseller">Çok satan</button>
+            </div>
+          </header>
+          <div class="category-chips" id="categoryChips" aria-label="Kategoriler"></div>
+          <div class="result-bar">
+            <span id="resultCount"></span>
+            <div class="result-controls">
+              <select id="productSort" aria-label="Ürünleri sırala">
+                <option value="featured">Önerilen sıralama</option>
+                <option value="price-asc">Fiyat: artan</option>
+                <option value="price-desc">Fiyat: azalan</option>
+                <option value="rating">Puana göre</option>
+              </select>
+            </div>
+          </div>
+          <div class="product-grid" id="productGrid"></div>
+        </div>
+      </section>
+
+      <section class="statement shell">
+        <div class="statement-inner">
+          <i class="statement-fox" data-fox></i>
+          <span class="eyebrow">VOLPARIA FELSEFESİ</span>
+          <h2>Az ama öz.<em>İyi kesim, iyi kumaş, iyi duruş.</em></h2>
+          <p>Gardırobunuza her sezon yenisi eklenecek parçalar değil; yıllarca sizinle kalacak, birbirini tamamlayan zamansız bir seçki sunuyoruz.</p>
+        </div>
+      </section>
+
+      <section class="newsletter"><div class="shell newsletter-inner"><div><span class="eyebrow">VOLPARIA BÜLTEN</span><h2>İlk sen duy.</h2><p>Yeni koleksiyonlar, iade stokları ve sana özel fırsatlar.</p></div><form id="newsletterForm"><div class="newsletter-row"><input type="email" id="newsletterEmail" required placeholder="E-posta adresin"><button class="button light" type="submit">Kaydol →</button></div><label class="newsletter-consent"><input type="checkbox" required> Ticari elektronik ileti almayı ve <button type="button" class="inline-link" data-page="kvkk">KVKK aydınlatma metnini</button> kabul ediyorum.</label></form></div></section>
+    </main>
+
+    <section class="assurance-strip" aria-label="Güvence">
+      <div class="shell assurance-inner">
+        <div class="assurance-item"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg></i><div><b>Güvenli alışveriş</b><small>Şifreli bağlantı</small></div></div>
+        <div class="assurance-item"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h9.5a6.5 6.5 0 0 1 0 13H8"/></svg></i><div><b>14 gün iade</b><small>Koşulsuz cayma hakkı</small></div></div>
+        <div class="assurance-item"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6a2 2 0 1 1 2-2"/><path d="M12 6l-9 7.5a1.4 1.4 0 0 0 .9 2.5h16.2a1.4 1.4 0 0 0 .9-2.5L12 6z"/></svg></i><div><b>Beden değişimi</b><small>Ücretsiz ilk değişim</small></div></div>
+        <div class="pay-badges" aria-label="Ödeme yöntemleri"><span>Havale/EFT</span><span>Kapıda Ödeme</span></div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="shell footer-grid">
+        <div>
+          <div class="footer-brand"><i class="brand-mark" data-fox></i>VOLPARIA</div>
+          <p>Sade, zamansız ve asil. Her bedene, her cinsiyete uygun seçilmiş parçalar.</p>
+          <div class="footer-social" id="footerSocial"></div>
+        </div>
+        <div><b>Koleksiyon</b><a href="#products" data-gender-link="kadin">Kadın</a><a href="#products" data-gender-link="erkek">Erkek</a><a href="#products" data-gender-link="unisex">Unisex</a><a href="#products" data-gender-link="cocuk">Çocuk</a></div>
+        <div><b>Yardım</b><button data-page="shipping">Kargo ve teslimat</button><button data-page="returns">İade ve değişim</button><button data-page="sizes">Beden rehberi</button><button data-page="faq">Sık sorulanlar</button><button data-page="contact">İletişim</button></div>
+        <div><b>Kurumsal ve Yasal</b><button data-page="about">Hakkımızda</button><button data-page="kvkk">KVKK Aydınlatma Metni</button><button data-page="privacy">Gizlilik politikası</button><button data-page="cookies">Çerez politikası</button><button data-page="distance">Mesafeli satış sözleşmesi</button><button data-page="terms">Kullanım koşulları</button></div>
+      </div>
+      <div class="footer-bottom shell"><span>© 2026 VOLPARIA Giyim — Tüm hakları saklıdır.</span><span id="footerContact"></span></div>
+    </footer>
+  </div>
+
+  <div class="overlay" id="overlay"></div>
+
+  <aside class="drawer" id="cartDrawer" aria-label="Sepet"><header><div><span class="eyebrow">ALIŞVERİŞ ÇANTAN</span><h2>Sepetim</h2></div><button class="round-close" data-close>×</button></header><div id="cartLines" class="cart-lines"></div><div class="cart-summary" id="cartSummary"></div></aside>
+  <aside class="drawer" id="favoriteDrawer" aria-label="Favoriler"><header><div><span class="eyebrow">KAYDETTİKLERİN</span><h2>Favorilerim</h2></div><button class="round-close" data-close>×</button></header><div id="favoriteLines" class="favorite-lines"></div></aside>
+
+  <section class="search-modal" id="searchModal" aria-label="Arama"><button class="round-close" data-close>×</button><div class="search-box"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.8-3.8"/></svg></span><input id="searchInput" autocomplete="off" placeholder="Ürün adı, ürün kodu veya kategori ara"><small>ESC ile kapat</small></div><div id="searchResults"></div></section>
+  <section class="modal" id="productModal" aria-label="Ürün detayı"><div class="modal-card product-detail" id="productDetail"></div></section>
+  <section class="modal" id="checkoutModal" aria-label="Ödeme"><div class="modal-card checkout-card" id="checkoutContent"></div></section>
+  <section class="modal" id="pageModal" aria-label="Bilgi sayfası"><div class="modal-card page-card" id="pageContent"></div></section>
+
+  <div class="cookie-banner" id="cookieBanner" role="dialog" aria-label="Çerez bildirimi" hidden>
+    <div class="cookie-text">
+      <b>🍪 Çerez ve veri bildirimi</b>
+      <p>Sepetinizi ve tercihlerinizi hatırlamak için yalnızca zorunlu yerel depolama kullanıyoruz; reklam veya izleme çerezi kullanmıyoruz. Ayrıntılar için <button class="inline-link" data-page="cookies">Çerez Politikası</button>'nı inceleyebilirsiniz.</p>
+    </div>
+    <div class="cookie-actions">
+      <button class="button outline" id="cookieEssential">Yalnızca gerekli</button>
+      <button class="button dark" id="cookieAccept">Kabul et</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+  <noscript>Bu mağazayı kullanmak için JavaScript'i etkinleştirin.</noscript>
+</body>
+</html>
