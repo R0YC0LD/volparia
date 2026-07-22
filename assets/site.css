@@ -395,8 +395,9 @@ select{appearance:none;-webkit-appearance:none;background-image:url("data:image/
 
 /* ---------- tilki logosu ---------- */
 .brand-mark svg,.hero-fox svg,.statement-fox svg{display:block}
-.hero-fox{position:relative;z-index:1;transform:none !important;width:100%}
+.hero-fox{position:relative;z-index:1;width:100%;animation:foxFloat 6.5s ease-in-out infinite}
 .hero-fox svg{width:min(220px,60%);height:auto;margin:auto;color:#8a4a20}
+@keyframes foxFloat{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-12px) rotate(1deg)}}
 .hero-panel{display:grid;place-items:center}
 .statement-fox{display:block;margin:0 auto 10px}
 .statement-fox svg{width:56px;height:56px;color:#dd9a63;margin:auto}
@@ -538,6 +539,112 @@ select{appearance:none;-webkit-appearance:none;background-image:url("data:image/
 .cat-active-chips .achip button{color:var(--accent);font-size:13px}
 .filter-toggle-mobile{display:none}
 .cat-sidebar .sidebar-close{display:none}
+
+/* ============ ANİMASYON & CİLA ============ */
+:root{--ease:cubic-bezier(.2,.7,.2,1)}
+/* kaydırınca beliren bölümler */
+.reveal{opacity:0;transform:translateY(22px);transition:opacity .7s var(--ease) var(--rd,0s),transform .7s var(--ease) var(--rd,0s);will-change:opacity,transform}
+.reveal.in{opacity:1;transform:none}
+
+/* header kaydırma durumu */
+.site-header{transition:box-shadow .35s var(--ease),background .35s var(--ease)}
+.site-header.scrolled{box-shadow:0 10px 34px -24px rgba(34,22,16,.5)}
+
+/* buton mikro-etkileşim */
+.button{transition:background .2s var(--ease),color .2s,transform .18s var(--ease),box-shadow .25s var(--ease)}
+.button:active{transform:translateY(0) scale(.96)}
+.button.dark:hover{box-shadow:0 14px 26px -14px rgba(34,22,16,.55)}
+.round-close{transition:background .2s,color .2s,transform .2s var(--ease)}
+.round-close:hover{transform:rotate(90deg)}
+.mega-trigger{transition:background .18s var(--ease),transform .18s var(--ease),box-shadow .2s}
+.mega-trigger:active{transform:scale(.96)}
+
+/* navigasyon alt çizgi kayması */
+.category-nav a{position:relative;border-bottom:0 !important}
+.category-nav a::after{content:"";position:absolute;left:0;right:100%;bottom:1px;height:2px;background:var(--ink);border-radius:2px;transition:right .28s var(--ease)}
+.category-nav .sale-link::after{background:var(--danger)}
+.category-nav a:hover::after,.category-nav a.active::after{right:0}
+
+/* ürün kartı: giriş animasyonu + görsel yakınlaşma */
+@keyframes cardUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.product-grid .product-card{animation:cardUp .5s var(--ease) both}
+.product-grid .product-card:nth-child(1){animation-delay:.02s}
+.product-grid .product-card:nth-child(2){animation-delay:.07s}
+.product-grid .product-card:nth-child(3){animation-delay:.12s}
+.product-grid .product-card:nth-child(4){animation-delay:.17s}
+.product-grid .product-card:nth-child(5){animation-delay:.22s}
+.product-grid .product-card:nth-child(6){animation-delay:.27s}
+.product-grid .product-card:nth-child(7){animation-delay:.3s}
+.product-grid .product-card:nth-child(8){animation-delay:.33s}
+.product-grid .product-card:nth-child(n+9){animation-delay:.36s}
+.product-art{transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
+.product-photo,.product-placeholder{transition:transform .55s var(--ease)}
+.product-card:hover .product-art{transform:translateY(-4px);box-shadow:0 22px 40px -24px rgba(34,22,16,.4)}
+.product-card:hover .product-photo{transform:scale(1.06)}
+.product-card:hover .product-placeholder{transform:scale(1.05)}
+.badge,.badge-flame{transition:transform .35s var(--ease)}
+.product-card:hover .badge{transform:translateY(-2px)}
+.favorite{transition:transform .2s var(--ease),color .2s,background .2s}
+.favorite:active{transform:scale(.8)}
+.favorite.active{animation:favPop .4s var(--ease)}
+@keyframes favPop{0%{transform:scale(1)}40%{transform:scale(1.35)}100%{transform:scale(1)}}
+.size-chip{transition:transform .18s var(--ease),border-color .18s,background .18s}
+.product-card:hover .size-chip{border-color:var(--muted)}
+
+/* cinsiyet kartı cilası */
+.gender-card{transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
+.gender-card .silhouette{transition:transform .5s var(--ease),background .3s}
+.gender-card:hover{transform:translateY(-6px);box-shadow:0 26px 44px -22px rgba(34,22,16,.45)}
+.gender-card:hover .silhouette{transform:scale(1.08) translateY(-6px)}
+.gender-card h3{transition:transform .3s var(--ease)}
+.gender-card:hover h3{transform:translateX(3px)}
+.gender-card::after{content:"→";position:absolute;top:20px;right:22px;font-size:18px;color:rgba(34,22,16,.55);opacity:0;transform:translateX(-6px);transition:.3s var(--ease)}
+.gender-card:hover::after{opacity:1;transform:none}
+
+/* sepet ikonu zıplaması */
+@keyframes cartPop{0%{transform:scale(1)}30%{transform:scale(1.28)}55%{transform:scale(.9)}100%{transform:scale(1)}}
+#cartButton.pop svg{animation:cartPop .5s var(--ease)}
+.header-actions b{transition:transform .25s var(--ease)}
+#cartButton.pop b{transform:scale(1.25)}
+
+/* mega-menü akıcı açılış + içerik kayması */
+.mega-menu{transition:opacity .22s var(--ease),transform .26s var(--ease),visibility .26s}
+.mega-menu.show .mega-side>*{animation:megaSlide .34s var(--ease) both}
+.mega-menu.show .mega-group,.mega-menu.show .mega-promo{animation:megaSlide .4s var(--ease) both}
+.mega-menu.show .mega-body .mega-group:nth-child(2){animation-delay:.05s}
+.mega-menu.show .mega-promo{animation-delay:.09s}
+@keyframes megaSlide{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
+.mega-side button,.mega-group a{transition:background .15s,color .15s,padding .18s var(--ease),box-shadow .15s}
+
+/* çekmece & modal içeriği */
+.drawer{transition:transform .34s var(--ease),box-shadow .34s}
+.modal-card{animation:modalIn .32s var(--ease) both}
+@keyframes modalIn{from{opacity:0;transform:translateY(16px) scale(.98)}to{opacity:1;transform:none}}
+.overlay{transition:opacity .3s var(--ease)}
+.cart-line,.favorite-line,.review-item{transition:transform .2s var(--ease),box-shadow .2s}
+.cart-line:hover,.favorite-line:hover{transform:translateX(-2px);box-shadow:0 10px 22px -16px rgba(34,22,16,.4)}
+
+/* çip & filtre etkileşimleri */
+.chip,.product-tabs button,.filter-list button,.size-filter button,.result-controls select,.cat-toolbar select{transition:all .18s var(--ease)}
+.chip:active,.size-filter button:active,.filter-list button:active{transform:scale(.95)}
+.achip{animation:cardUp .3s var(--ease) both}
+
+/* toast yükseliş */
+.toast{transition:opacity .3s var(--ease),transform .35s var(--ease)}
+
+/* duyuru bandı ışıltısı */
+.announcement{background:linear-gradient(90deg,var(--ink),#3a281c,var(--ink));background-size:200% 100%;animation:announceShine 12s linear infinite}
+@keyframes announceShine{0%{background-position:0% 0}100%{background-position:200% 0}}
+
+/* mobil menü & sosyal */
+.footer-social a{transition:transform .2s var(--ease),border-color .2s,color .2s}
+.footer-social a:hover{transform:translateY(-3px)}
+.mini-result{transition:transform .18s var(--ease),border-color .18s,box-shadow .2s}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;scroll-behavior:auto !important}
+  .reveal{opacity:1;transform:none}
+}
 
 /* ---------- responsive ---------- */
 @media (max-width:1080px){

@@ -139,23 +139,19 @@
       <div class="mega-body">${megaBodyHtml(gender)}</div>
     </div>`;
   }
-  let currentMega = "kadin", megaTimer;
+  let currentMega = "kadin", megaOpen = false;
   function openMega(gender) {
     const menu = $("#megaMenu"), nav = $("#categoryNav"); if (!menu) return;
     if (gender !== currentMega || !menu.classList.contains("show")) { currentMega = gender; menu.innerHTML = megaInnerHtml(gender); }
-    menu.classList.add("show"); nav.classList.add("mega-open");
+    menu.classList.add("show"); nav.classList.add("mega-open"); megaOpen = true;
   }
-  function closeMega() { const menu = $("#megaMenu"), nav = $("#categoryNav"); if (!menu) return; menu.classList.remove("show"); nav.classList.remove("mega-open"); }
+  function closeMega() { const menu = $("#megaMenu"), nav = $("#categoryNav"); if (!menu) return; menu.classList.remove("show"); nav.classList.remove("mega-open"); megaOpen = false; }
+  function toggleMega() { megaOpen ? closeMega() : openMega(currentMega); }
   function initMegaMenu() {
     const nav = $("#categoryNav"), menu = $("#megaMenu"); if (!nav || !menu) return;
-    const cancel = () => clearTimeout(megaTimer);
-    const schedule = () => { cancel(); megaTimer = setTimeout(closeMega, 160); };
-    nav.addEventListener("mouseenter", () => { cancel(); openMega(currentMega); });
-    nav.addEventListener("mouseleave", schedule);
-    menu.addEventListener("mouseenter", cancel);
-    menu.addEventListener("mouseleave", schedule);
-    nav.addEventListener("mouseover", e => { const a = e.target.closest("[data-nav-gender]"); if (a) openMega(a.dataset.navGender); });
+    // Menü tıklamayla açılır; açıkken cinsiyet sekmesi/başlık üzerine gelince panel değişir.
     menu.addEventListener("mouseover", e => { const g = e.target.closest("[data-mega-gender]"); if (g && g.dataset.megaGender !== currentMega) openMega(g.dataset.megaGender); });
+    nav.addEventListener("mouseover", e => { if (!megaOpen) return; const a = e.target.closest("[data-nav-gender]"); if (a) openMega(a.dataset.navGender); });
   }
 
   /* ======================= KATEGORİ SAYFASI ======================= */
@@ -341,6 +337,7 @@
     if (already + qty > stock) { toast(`${sizeName} bedeninden en fazla ${stock} adet ekleyebilirsin`, false); return; }
     if (line) line.quantity += qty; else state.cart.push({ id, size: sizeName, quantity: qty });
     persist(); renderHeader(); renderCart();
+    const cb = $("#cartButton"); if (cb) { cb.classList.remove("pop"); void cb.offsetWidth; cb.classList.add("pop"); setTimeout(() => cb.classList.remove("pop"), 520); }
     toast(`${p.name} (${sizeName}) sepete eklendi`);
   }
   function cartGross() { return state.cart.reduce((sum, l) => { const p = state.products.find(x => x.id === l.id); return sum + (p ? p.price * l.quantity : 0); }, 0); }
@@ -531,7 +528,8 @@
       return;
     }
 
-    if (closest("#megaTrigger")) { location.href = "kategori.html"; return; }
+    if (closest("#megaTrigger")) { if (window.innerWidth <= 720) location.href = "kategori.html"; else toggleMega(); return; }
+    if (megaOpen && !closest("#megaMenu") && !closest("#categoryNav")) closeMega();
     if ((el = closest("[data-mega-gender]"))) { location.href = `kategori.html?cinsiyet=${el.dataset.megaGender}`; return; }
     if ((el = closest("[data-mega-link]"))) { location.href = `kategori.html?filtre=${el.dataset.megaLink}`; return; }
 
@@ -628,10 +626,34 @@
 
   if (location.hash === "#yonetim") location.href = "admin.html";
 
+  /* ---------- animasyonlar ---------- */
+  function initReveal() {
+    if (!("IntersectionObserver" in window) || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); } });
+    }, { threshold: 0.12, rootMargin: "0px 0px -40px 0px" });
+    const sel = ".trust article,#genders .section-head,.gender-card,.products-section .section-head,.statement-inner,.newsletter-inner,.assurance-item,.cat-head,.cat-sidebar";
+    $$(sel).forEach((el, i) => {
+      // Ekranda hâlihazırda görünen öğeleri olduğu gibi bırak (titreme olmasın); yalnızca alttakileri canlandır.
+      if (el.getBoundingClientRect().top < window.innerHeight * 0.85) return;
+      el.classList.add("reveal");
+      el.style.setProperty("--rd", (i % 5) * 0.07 + "s");
+      io.observe(el);
+    });
+  }
+  function initHeaderScroll() {
+    const h = $(".site-header"); if (!h) return;
+    const onScroll = () => h.classList.toggle("scrolled", window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+  }
+
   /* ---------- başlangıç ---------- */
   renderAll();
   initMegaMenu();
   if (isCategoryPage) { updateCatUrl(true); const sortSel = $("#catSort"); if (sortSel) sortSel.value = catState.sort; }
+  initReveal();
+  initHeaderScroll();
   setStorageIndicator(false);
   initCookieBanner();
   handlePaymentReturn();
