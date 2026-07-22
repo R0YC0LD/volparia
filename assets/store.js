@@ -681,11 +681,12 @@
   }
 
   /* ---------- stok gelince haber ver (izleme listesi) ---------- */
-  function addWatch(productId, size) {
-    if (state.watchlist.some(w => w.productId === productId && w.size === size)) { toast("Bu beden için zaten haber listesindesin"); return; }
-    state.watchlist.push({ productId, size, addedAt: Date.now() });
-    persist();
+  function toggleWatch(productId, size) {
+    const i = state.watchlist.findIndex(w => w.productId === productId && w.size === size);
+    if (i >= 0) { state.watchlist.splice(i, 1); persist(); toast("Haber listesinden çıkarıldı"); return false; }
+    state.watchlist.push({ productId, size, addedAt: Date.now() }); persist();
     toast("🔔 Stok gelince sana haber vereceğiz");
+    return true;
   }
   function checkWatchlist() {
     if (!state.watchlist.length) return;
@@ -776,7 +777,7 @@
     if ((el = closest("[data-bundle]"))) { openBundle(el.dataset.bundle); return; }
     if ((el = closest("[data-bundle-size]"))) { bundleSizes[el.dataset.bundleSize] = el.dataset.size; renderBundleDetail(getBundle($("#bundleAdd")?.dataset.bundleAdd)); return; }
     if ((el = closest("[data-bundle-add]"))) { addBundleToCart(el.dataset.bundleAdd); return; }
-    if ((el = closest("[data-watch]"))) { addWatch(el.dataset.watch, el.dataset.watchSize); el.classList.add("watching"); if (!/✓/.test(el.textContent)) el.textContent = el.textContent + " ✓"; return; }
+    if ((el = closest("[data-watch]"))) { const on = toggleWatch(el.dataset.watch, el.dataset.watchSize); el.classList.toggle("watching", on); el.textContent = el.dataset.watchSize + (on ? " ✓" : ""); return; }
     if ((el = closest("[data-product]"))) { openProduct(el.dataset.product); return; }
 
     if ((el = closest("[data-size-pick]"))) {
@@ -830,8 +831,10 @@
 
   if (isCategoryPage) window.addEventListener("popstate", () => {
     const p = new URLSearchParams(location.search);
-    catState.gender = p.get("cinsiyet") || ""; catState.category = p.get("kategori") || "";
-    catState.filter = p.get("filtre") || ""; catState.q = p.get("ara") || "";
+    const g = p.get("cinsiyet") || "", c = p.get("kategori") || "", f = p.get("filtre") || "", q = p.get("ara") || "", k = p.get("kombin") === "1";
+    // Sadece bir katman kapandıysa (URL parametreleri değişmediyse) yeniden çizme.
+    if (g === catState.gender && c === catState.category && f === catState.filter && q === catState.q && k === catState.kombin) return;
+    catState.gender = g; catState.category = c; catState.filter = f; catState.q = q; catState.kombin = k;
     renderCategoryPage();
   });
 
