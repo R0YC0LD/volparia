@@ -59,6 +59,17 @@ yapılan her değişiklik (ürün, stok, fiyat, ayar…) 1-2 saniye içinde tüm
 5 dakikadan uzun süre dokunulmayan sekmeler kotayı korumak için otomatik yavaşlar,
 kullanıcı sayfaya dönünce anında hızlanır. (`config.js` → `syncIntervalMs`)
 
+## Kategori sistemi (Trendyol tarzı)
+
+- Üstteki **"Tüm Kategoriler"** düğmesine gelince açılan **mega-menü**, cinsiyet sekmeleri
+  (Kadın/Erkek/Unisex/Çocuk) ve her cinsiyetin kategorilerini kolonlar hâlinde gösterir.
+- Her kategori/cinsiyet kendi **adresine** sahip bir sayfa açar
+  (örn. `kategori.html?cinsiyet=kadin&kategori=Elbise`) — bağlantı paylaşılabilir, yer imlenebilir.
+- Kategori sayfasında sol tarafta **filtre paneli** vardır: cinsiyet, kategori, beden,
+  "sadece stoktakiler". Sağ üstte sıralama. Seçili filtreler URL'ye yansır (geri/ileri çalışır).
+- **Kategoriler admin panelinden yönetilir** (Kategoriler modülü). Yeni bir kategori ekleyince
+  hem mega-menüde hem de kendi sayfasıyla otomatik belirir; ayrı dosya oluşturmaya gerek yoktur.
+
 ## KVKK / Çerez uyumu
 
 - Siteye ilk girişte **çerez bildirimi** çıkar; tercih kaydedilir.

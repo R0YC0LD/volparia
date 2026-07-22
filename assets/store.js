@@ -5,9 +5,15 @@
   /* tilki logosunu yerleştir */
   $$("[data-fox]").forEach(el => { el.innerHTML = foxMark; });
 
+  const GENDER_TONES = { kadin: ["#f0d8ca", "#ddb49c"], erkek: ["#e4d8c6", "#bfa585"], unisex: ["#eee0c9", "#d7bd93"], cocuk: ["#f4ddc0", "#e5b586"] };
+  const isHome = !!$("#genderGrid");
+  const isCategoryPage = !!$("#categoryView");
+  const PARAMS = new URLSearchParams(location.search);
+
   /* ---------- render ---------- */
   function renderGenders() {
-    const tones = { kadin: ["#f0d8ca", "#ddb49c"], erkek: ["#e4d8c6", "#bfa585"], unisex: ["#eee0c9", "#d7bd93"], cocuk: ["#f4ddc0", "#e5b586"] };
+    if (!$("#genderGrid")) return;
+    const tones = GENDER_TONES;
     const copy = { kadin: "Zarafetin günlük hali", erkek: "Net çizgiler, rahat duruş", unisex: "Herkese ait parçalar", cocuk: "Konforlu ve dayanıklı" };
     $("#genderGrid").innerHTML = Object.entries(GENDERS).map(([key, label], i) => {
       const count = state.products.filter(p => p.active !== false && p.gender === key).length;
@@ -65,6 +71,7 @@
     </article>`;
   }
   function renderProducts() {
+    if (!$("#productGrid")) return;
     const list = filteredProducts();
     $("#productGrid").innerHTML = list.length ? list.map(productCard).join("") : `<div class="empty">Aramana uygun ürün bulunamadı.</div>`;
     $("#resultCount").textContent = `${list.length} ürün gösteriliyor`;
@@ -84,17 +91,159 @@
   function renderHeader() {
     $("#cartCount").textContent = state.cart.reduce((s, l) => s + l.quantity, 0);
     $("#favoriteCount").textContent = state.favorites.length;
-    $("#announcement").textContent = state.settings.announcement;
-    $("#heroEyebrow").textContent = state.settings.heroEyebrow;
-    const [a, b] = String(state.settings.heroTitle || "").split("|");
-    $("#heroTitle").innerHTML = `${esc(a || "")}<em>${esc(b || "")}</em>`;
-    $("#heroCopy").textContent = state.settings.heroCopy;
-    $("#footerContact").textContent = [state.settings.supportEmail, state.settings.supportPhone].filter(Boolean).join(" · ");
-    document.title = state.settings.seoTitle || defaultSettings.seoTitle;
-    $('meta[name="description"]')?.setAttribute("content", state.settings.seoDescription || defaultSettings.seoDescription);
+    if ($("#announcement")) $("#announcement").textContent = state.settings.announcement;
+    if ($("#heroEyebrow")) {
+      $("#heroEyebrow").textContent = state.settings.heroEyebrow;
+      const [a, b] = String(state.settings.heroTitle || "").split("|");
+      $("#heroTitle").innerHTML = `${esc(a || "")}<em>${esc(b || "")}</em>`;
+      $("#heroCopy").textContent = state.settings.heroCopy;
+    }
+    if ($("#footerContact")) $("#footerContact").textContent = [state.settings.supportEmail, state.settings.supportPhone].filter(Boolean).join(" · ");
+    if (isHome) {
+      document.title = state.settings.seoTitle || defaultSettings.seoTitle;
+      $('meta[name="description"]')?.setAttribute("content", state.settings.seoDescription || defaultSettings.seoDescription);
+    }
   }
-  function renderAll() { renderHeader(); renderGenders(); renderProducts(); renderCart(); renderFavorites(); renderSocial(); }
+  function renderAll() {
+    renderHeader(); renderGenders(); renderProducts(); renderCart(); renderFavorites(); renderSocial();
+    if (isCategoryPage) renderCategoryPage();
+  }
   window.onDataRefresh = renderAll;
+
+  /* ======================= MEGA-MENÜ (Trendyol tarzı) ======================= */
+  const categoryCount = (gender, cat) => state.products.filter(p => p.active !== false && (!gender || p.gender === gender) && p.category === cat).length;
+  const genderProductCount = gender => state.products.filter(p => p.active !== false && p.gender === gender).length;
+  function megaBodyHtml(gender) {
+    const cats = getCategories();
+    const half = Math.ceil(cats.length / 2);
+    const colLinks = list => list.map(c => `<a href="kategori.html?cinsiyet=${encodeURIComponent(gender)}&kategori=${encodeURIComponent(c)}">${esc(c)}<span>${categoryCount(gender, c)}</span></a>`).join("");
+    return `<div class="mega-group"><b>KATEGORİLER</b>${colLinks(cats.slice(0, half))}</div>
+      <div class="mega-group"><b>&nbsp;</b>${colLinks(cats.slice(half))}
+        <a class="strong" style="margin-top:10px;border-top:1px solid var(--line);padding-top:12px" href="kategori.html?cinsiyet=${encodeURIComponent(gender)}">Tüm ${esc(GENDERS[gender])} ürünleri →</a>
+      </div>
+      <div class="mega-promo">
+        <div><span class="eyebrow">VOLPARIA SEÇKİSİ</span><h4>${esc(GENDERS[gender])} yeni sezon</h4><p>Zamansız parçalar, gerçek beden stoğu.</p></div>
+        <a class="button dark" href="kategori.html?cinsiyet=${encodeURIComponent(gender)}&filtre=new">Yeni gelenler →</a>
+        <i class="promo-fox">${foxMark}</i>
+      </div>`;
+  }
+  function megaInnerHtml(gender) {
+    return `<div class="mega-inner">
+      <div class="mega-side">
+        ${Object.entries(GENDERS).map(([k, v]) => `<button data-mega-gender="${k}" class="${k === gender ? "active" : ""}">${v}<i>${genderProductCount(k)} ›</i></button>`).join("")}
+        <div class="mega-side-sep"></div>
+        <button data-mega-link="new">Yeni Gelenler<i>›</i></button>
+        <button data-mega-link="sale">İndirimdekiler<i>›</i></button>
+        <button data-mega-link="bestseller">Çok Satanlar<i>›</i></button>
+      </div>
+      <div class="mega-body">${megaBodyHtml(gender)}</div>
+    </div>`;
+  }
+  let currentMega = "kadin", megaTimer;
+  function openMega(gender) {
+    const menu = $("#megaMenu"), nav = $("#categoryNav"); if (!menu) return;
+    if (gender !== currentMega || !menu.classList.contains("show")) { currentMega = gender; menu.innerHTML = megaInnerHtml(gender); }
+    menu.classList.add("show"); nav.classList.add("mega-open");
+  }
+  function closeMega() { const menu = $("#megaMenu"), nav = $("#categoryNav"); if (!menu) return; menu.classList.remove("show"); nav.classList.remove("mega-open"); }
+  function initMegaMenu() {
+    const nav = $("#categoryNav"), menu = $("#megaMenu"); if (!nav || !menu) return;
+    const cancel = () => clearTimeout(megaTimer);
+    const schedule = () => { cancel(); megaTimer = setTimeout(closeMega, 160); };
+    nav.addEventListener("mouseenter", () => { cancel(); openMega(currentMega); });
+    nav.addEventListener("mouseleave", schedule);
+    menu.addEventListener("mouseenter", cancel);
+    menu.addEventListener("mouseleave", schedule);
+    nav.addEventListener("mouseover", e => { const a = e.target.closest("[data-nav-gender]"); if (a) openMega(a.dataset.navGender); });
+    menu.addEventListener("mouseover", e => { const g = e.target.closest("[data-mega-gender]"); if (g && g.dataset.megaGender !== currentMega) openMega(g.dataset.megaGender); });
+  }
+
+  /* ======================= KATEGORİ SAYFASI ======================= */
+  const catState = {
+    gender: PARAMS.get("cinsiyet") || "",
+    category: PARAMS.get("kategori") || "",
+    filter: PARAMS.get("filtre") || "",
+    q: PARAMS.get("ara") || "",
+    sizes: new Set(), inStock: false, sort: "featured"
+  };
+  const FILTER_LABEL = { new: "Yeni Gelenler", sale: "İndirimdekiler", bestseller: "Çok Satanlar" };
+  function catScope() {
+    let list = state.products.filter(p => p.active !== false);
+    if (catState.gender) list = list.filter(p => p.gender === catState.gender);
+    if (catState.filter) list = list.filter(p => (p.tags || []).includes(catState.filter));
+    if (catState.q) { const q = catState.q.toLocaleLowerCase("tr"); list = list.filter(p => `${p.name} ${p.brand} ${p.sku} ${p.category}`.toLocaleLowerCase("tr").includes(q)); }
+    return list;
+  }
+  function catFinalList() {
+    let list = catScope();
+    if (catState.category) list = list.filter(p => p.category === catState.category);
+    if (catState.sizes.size) list = list.filter(p => sizesOf(p).some(s => catState.sizes.has(s.name) && (!catState.inStock || (Number(s.stock) || 0) > 0)));
+    if (catState.inStock) list = list.filter(p => !isSoldOut(p));
+    const s = catState.sort;
+    if (s === "price-asc") list = [...list].sort((a, b) => a.price - b.price);
+    else if (s === "price-desc") list = [...list].sort((a, b) => b.price - a.price);
+    else if (s === "rating") list = [...list].sort((a, b) => (ratingInfo(b).score || 0) - (ratingInfo(a).score || 0));
+    else if (s === "newest") list = [...list].sort((a, b) => ((b.tags || []).includes("new") ? 1 : 0) - ((a.tags || []).includes("new") ? 1 : 0));
+    return list;
+  }
+  function catTitle() {
+    if (catState.category) return catState.category;
+    if (catState.filter) return FILTER_LABEL[catState.filter] || "Ürünler";
+    if (catState.gender) return `${GENDERS[catState.gender]} Koleksiyonu`;
+    return "Tüm Ürünler";
+  }
+  function updateCatUrl(replace) {
+    const p = new URLSearchParams();
+    if (catState.gender) p.set("cinsiyet", catState.gender);
+    if (catState.category) p.set("kategori", catState.category);
+    if (catState.filter) p.set("filtre", catState.filter);
+    if (catState.q) p.set("ara", catState.q);
+    const url = `kategori.html${p.toString() ? "?" + p.toString() : ""}`;
+    history[replace ? "replaceState" : "pushState"](null, "", url);
+    document.title = `${catTitle()} — VOLPARIA`;
+  }
+  function renderCatHead() {
+    const crumbs = [`<a href="index.html">Ana Sayfa</a>`];
+    if (catState.gender) crumbs.push(`<span class="sep">/</span><a href="kategori.html?cinsiyet=${catState.gender}">${esc(GENDERS[catState.gender])}</a>`);
+    if (catState.category) crumbs.push(`<span class="sep">/</span><b>${esc(catState.category)}</b>`);
+    else if (catState.filter) crumbs.push(`<span class="sep">/</span><b>${esc(FILTER_LABEL[catState.filter] || "")}</b>`);
+    else if (!catState.gender) crumbs.push(`<span class="sep">/</span><b>Tüm Ürünler</b>`);
+    $("#catBreadcrumb").innerHTML = crumbs.join("");
+    $("#catTitle").textContent = catTitle();
+  }
+  function renderCatSidebar() {
+    const scope = catScope();
+    const genderRows = [["", "Tümü", state.products.filter(p => p.active !== false).length]]
+      .concat(Object.entries(GENDERS).map(([k, v]) => [k, v, genderProductCount(k)]))
+      .map(([k, v, n]) => `<button data-cat-gender="${k}" class="${catState.gender === k ? "active" : ""}">${esc(v)}<span>${n}</span></button>`).join("");
+    const catRows = [`<button data-cat-cat="" class="${!catState.category ? "active" : ""}">Tümü<span>${scope.length}</span></button>`]
+      .concat(getCategories().map(c => {
+        const n = scope.filter(p => p.category === c).length;
+        return `<button data-cat-cat="${esc(c)}" class="${catState.category === c ? "active" : ""}">${esc(c)}<span>${n}</span></button>`;
+      })).join("");
+    const sizeSet = [...new Set(scope.flatMap(p => sizesOf(p).map(s => s.name)))];
+    const sizeRows = sizeSet.length ? sizeSet.map(sz => `<button data-cat-size="${esc(sz)}" class="${catState.sizes.has(sz) ? "active" : ""}">${esc(sz)}</button>`).join("") : `<span style="font-size:12px;color:var(--muted)">—</span>`;
+    const hasActive = catState.category || catState.sizes.size || catState.inStock || catState.filter;
+    $("#catSidebar").innerHTML = `
+      <div class="sidebar-close">Filtreler<button class="round-close" data-cat-filter-close>×</button></div>
+      <div class="filter-group"><h4>Cinsiyet</h4><div class="filter-list">${genderRows}</div></div>
+      <div class="filter-group"><h4>Kategori</h4><div class="filter-list">${catRows}</div></div>
+      <div class="filter-group"><h4>Beden</h4><div class="size-filter">${sizeRows}</div></div>
+      <div class="filter-group"><h4>Durum</h4><label class="filter-toggle"><input type="checkbox" id="catInStock" ${catState.inStock ? "checked" : ""}>Sadece stoktakiler</label></div>
+      ${hasActive ? `<button class="filter-clear" data-cat-clear>× Filtreleri temizle</button>` : ""}`;
+  }
+  function renderCatGrid() {
+    const list = catFinalList();
+    $("#categoryGrid").innerHTML = list.length ? list.map(productCard).join("") : `<div class="empty">Bu filtrelere uygun ürün bulunamadı. Filtreleri temizleyip tekrar deneyin.</div>`;
+    $("#catCount").textContent = `${list.length} ürün`;
+    const chips = [];
+    if (catState.category) chips.push(["kategori", catState.category]);
+    if (catState.filter) chips.push(["filtre", FILTER_LABEL[catState.filter]]);
+    catState.sizes.forEach(s => chips.push(["beden", s, s]));
+    if (catState.inStock) chips.push(["stok", "Stoktakiler"]);
+    $("#catChips").innerHTML = chips.map(([type, label, val]) => `<span class="achip">${esc(label)}<button data-chip-remove="${type}" data-chip-val="${esc(val || "")}">×</button></span>`).join("");
+  }
+  function renderCategoryPage() { renderCatHead(); renderCatSidebar(); renderCatGrid(); }
 
   /* ---------- ürün detay ---------- */
   let detailQty = 1, detailSize = null;
@@ -357,7 +506,7 @@
 
   /* ---------- çerez bildirimi ---------- */
   function initCookieBanner() {
-    const banner = $("#cookieBanner");
+    const banner = $("#cookieBanner"); if (!banner) return;
     const saved = localStorage.getItem("volparia_consent");
     if (!saved) banner.hidden = false;
     const decide = level => { localStorage.setItem("volparia_consent", JSON.stringify({ level, date: new Date().toISOString() })); banner.hidden = true; };
@@ -374,12 +523,33 @@
     if (closest("[data-close]") || e.target === $("#overlay")) { closeLayers(); return; }
 
     if (closest("#secretLogo")) {
+      if (!isHome) { location.href = "index.html"; return; }
       logoClicks++; clearTimeout(logoTimer);
       logoTimer = setTimeout(() => { logoClicks = 0; }, 1800);
       if (logoClicks >= 5) { logoClicks = 0; location.href = "admin.html"; }
       else if (logoClicks === 1) { state.activeGender = ""; state.activeFilter = "all"; state.activeCategory = ""; state.search = ""; renderProducts(); window.scrollTo({ top: 0, behavior: "smooth" }); }
       return;
     }
+
+    if (closest("#megaTrigger")) { location.href = "kategori.html"; return; }
+    if ((el = closest("[data-mega-gender]"))) { location.href = `kategori.html?cinsiyet=${el.dataset.megaGender}`; return; }
+    if ((el = closest("[data-mega-link]"))) { location.href = `kategori.html?filtre=${el.dataset.megaLink}`; return; }
+
+    /* kategori sayfası filtreleri */
+    if ((el = closest("[data-cat-gender]"))) { catState.gender = el.dataset.catGender; catState.sizes.clear(); updateCatUrl(); renderCategoryPage(); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+    if ((el = closest("[data-cat-cat]"))) { catState.category = el.dataset.catCat; updateCatUrl(); renderCategoryPage(); return; }
+    if ((el = closest("[data-cat-size]"))) { const s = el.dataset.catSize; catState.sizes.has(s) ? catState.sizes.delete(s) : catState.sizes.add(s); renderCatSidebar(); renderCatGrid(); return; }
+    if ((el = closest("[data-cat-clear]"))) { catState.category = ""; catState.filter = ""; catState.sizes.clear(); catState.inStock = false; updateCatUrl(); renderCategoryPage(); return; }
+    if ((el = closest("[data-chip-remove]"))) {
+      const t = el.dataset.chipRemove;
+      if (t === "kategori") catState.category = "";
+      else if (t === "filtre") catState.filter = "";
+      else if (t === "stok") catState.inStock = false;
+      else if (t === "beden") catState.sizes.delete(el.dataset.chipVal);
+      updateCatUrl(); renderCategoryPage(); return;
+    }
+    if (closest("[data-cat-filter-close]")) { $("#catSidebar").classList.remove("show"); $("#overlay").classList.remove("show"); document.body.classList.remove("locked"); return; }
+    if (closest("#filterToggle")) { $("#catSidebar").classList.add("show"); $("#overlay").classList.add("show"); document.body.classList.add("locked"); return; }
 
     if (closest("#searchTrigger") || closest("#searchMobile")) { openSearch(); return; }
     if (closest("#favoritesButton")) { renderFavorites(); openLayer($("#favoriteDrawer")); return; }
@@ -390,8 +560,7 @@
     if (closest("#applyCoupon")) { applyCoupon(); return; }
     if (closest("[data-remove-coupon]")) { state.coupon = null; persist(); renderCart(); return; }
 
-    if ((el = closest("[data-gender-link]"))) { state.activeGender = el.dataset.genderLink; state.activeFilter = "all"; state.activeCategory = ""; renderProducts(); return; }
-    if ((el = closest("[data-gender-card]"))) { state.activeGender = el.dataset.genderCard; state.activeFilter = "all"; state.activeCategory = ""; renderProducts(); $("#products").scrollIntoView({ behavior: "smooth" }); return; }
+    if ((el = closest("[data-gender-card]"))) { location.href = `kategori.html?cinsiyet=${el.dataset.genderCard}`; return; }
     if ((el = closest("[data-filter-link]"))) { state.activeFilter = el.dataset.filterLink; state.activeGender = ""; $$(".product-tabs button").forEach(b => b.classList.toggle("active", b.dataset.filter === state.activeFilter)); renderProducts(); return; }
     if ((el = closest("[data-category-chip]")) ) { state.activeCategory = el.dataset.categoryChip; renderProducts(); return; }
     if ((el = closest("[data-show-all]"))) { state.activeGender = ""; state.activeCategory = ""; state.activeFilter = "all"; renderProducts(); $("#products").scrollIntoView({ behavior: "smooth" }); return; }
@@ -432,14 +601,16 @@
 
   document.addEventListener("change", e => {
     if (e.target.id === "productSort") renderProducts();
+    if (e.target.id === "catSort") { catState.sort = e.target.value; renderCatGrid(); }
+    if (e.target.id === "catInStock") { catState.inStock = e.target.checked; renderCatSidebar(); renderCatGrid(); }
   });
   document.addEventListener("keydown", e => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openSearch(); }
-    if (e.key === "Escape") closeLayers();
+    if (e.key === "Escape") { closeLayers(); closeMega(); $("#catSidebar")?.classList.remove("show"); }
   });
-  $("#searchInput").addEventListener("input", e => renderSearch(e.target.value));
+  $("#searchInput")?.addEventListener("input", e => renderSearch(e.target.value));
 
-  $("#newsletterForm").addEventListener("submit", async e => {
+  $("#newsletterForm")?.addEventListener("submit", async e => {
     e.preventDefault();
     const email = $("#newsletterEmail").value.trim().toLowerCase();
     if (state.apiOnline) { try { await api("/api/newsletter", { method: "POST", body: JSON.stringify({ email }) }); } catch { } }
@@ -448,10 +619,19 @@
     toast("Bültene kaydoldun, hoş geldin!");
   });
 
+  if (isCategoryPage) window.addEventListener("popstate", () => {
+    const p = new URLSearchParams(location.search);
+    catState.gender = p.get("cinsiyet") || ""; catState.category = p.get("kategori") || "";
+    catState.filter = p.get("filtre") || ""; catState.q = p.get("ara") || "";
+    renderCategoryPage();
+  });
+
   if (location.hash === "#yonetim") location.href = "admin.html";
 
   /* ---------- başlangıç ---------- */
   renderAll();
+  initMegaMenu();
+  if (isCategoryPage) { updateCatUrl(true); const sortSel = $("#catSort"); if (sortSel) sortSel.value = catState.sort; }
   setStorageIndicator(false);
   initCookieBanner();
   handlePaymentReturn();
