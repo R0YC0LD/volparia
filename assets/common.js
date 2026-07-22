@@ -70,6 +70,10 @@ const defaultSettings = {
   seoTitle: "VOLPARIA — Sade Giyin, Asil Kal",
   seoDescription: "Her cinsiyete ve her bedene uygun, özenle seçilmiş zamansız parçalar. Minimal ve asil giyim mağazası.",
   instagram: "", tiktok: "", twitter: "", whatsapp: "",
+  bundles: [
+    { id: "b1", name: "Ofis Şıklığı Kombini", description: "Keten gömlek ve slim chino ile ofisten davete zamansız bir duruş.", productIds: ["g2", "g4"], discountPercent: 15, badge: "Kombin", tone: "#e4d8c6", active: true },
+    { id: "b2", name: "Hafta Sonu Rahatlığı", description: "Oversize tişört ve kaşmir karışım kazak; katmanlı, konforlu, şık.", productIds: ["g1", "g5"], discountPercent: 18, badge: "Çok Tutulan", tone: "#eee0c9", active: true }
+  ],
   pages: {}
 };
 
@@ -113,18 +117,20 @@ const state = {
   reviews: readLocal("reviews", []),
   subscribers: readLocal("subscribers", []),
   coupon: readLocal("coupon", null),
+  watchlist: readLocal("watchlist", []),
   reviewStats: {},
   pos: { configured: false, provider: "iyzico", testMode: true },
   token: sessionStorage.getItem("volparia_admin_token") || "",
   apiOnline: false, version: null,
   activeFilter: "all", activeGender: "", activeCategory: "", search: "",
   adminView: "dashboard",
-  admin: { products: null, orders: null, coupons: null, reviews: null, subscribers: null, audit: null, pos: null, productQuery: "", orderQuery: "", customerQuery: "", editing: null, contentKey: "about" }
+  admin: { products: null, orders: null, coupons: null, reviews: null, subscribers: null, audit: null, pos: null, productQuery: "", orderQuery: "", customerQuery: "", editing: null, bundleEdit: null, contentKey: "about" }
 };
 function persist() {
   writeLocal("products", state.products); writeLocal("cart", state.cart); writeLocal("favorites", state.favorites);
   writeLocal("settings", state.settings); writeLocal("orders", state.orders); writeLocal("coupons", state.coupons);
   writeLocal("reviews", state.reviews); writeLocal("subscribers", state.subscribers); writeLocal("coupon", state.coupon);
+  writeLocal("watchlist", state.watchlist);
 }
 let toastTimer;
 function toast(text, ok = true) { const el = $("#toast"); if (!el) return; el.textContent = `${ok ? "✓" : "!"} ${text}`; el.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("show"), 2800); }
@@ -198,6 +204,18 @@ const critical = p => Number(p.criticalStock) || state.settings.criticalStockDef
 const isSoldOut = p => totalStock(p) <= 0;
 const isLowStock = p => { const t = totalStock(p); return t > 0 && t <= critical(p); };
 function getCategories() { return state.settings.categories?.length ? state.settings.categories : DEFAULT_CATEGORIES; }
+
+/* ---------- kombinler ---------- */
+const getBundles = () => Array.isArray(state.settings.bundles) ? state.settings.bundles : [];
+const getBundle = id => getBundles().find(b => b.id === id);
+const bundleMembers = b => (b.productIds || []).map(id => state.products.find(p => p.id === id)).filter(Boolean);
+const bundleGross = b => bundleMembers(b).reduce((s, p) => s + (Number(p.price) || 0), 0);
+const bundleDiscountPct = b => Math.max(0, Math.min(90, Number(b.discountPercent) || 0));
+const bundlePrice = b => Math.round(bundleGross(b) * (100 - bundleDiscountPct(b)) / 100);
+const bundleSavings = b => bundleGross(b) - bundlePrice(b);
+const bundleActive = b => b && b.active !== false && bundleMembers(b).length >= 2;
+const bundleAvailable = b => bundleActive(b) && bundleMembers(b).every(p => !isSoldOut(p));
+function activeBundles() { return getBundles().filter(bundleActive); }
 
 /* ---------- yorum istatistikleri (yerel mod) ---------- */
 function localReviewStats() {

@@ -10,12 +10,20 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/site.css?v=6">
-  <script src="config.js?v=6"></script>
-  <script src="assets/common.js?v=6" defer></script>
-  <script src="assets/store.js?v=6" defer></script>
+  <script>try{if(!sessionStorage.getItem("volparia_intro")){document.documentElement.classList.add("intro-pending");sessionStorage.setItem("volparia_intro","1");}}catch(e){}</script>
+  <link rel="stylesheet" href="assets/site.css?v=7">
+  <script src="config.js?v=7"></script>
+  <script src="assets/common.js?v=7" defer></script>
+  <script src="assets/store.js?v=7" defer></script>
 </head>
 <body>
+  <div class="intro-screen" id="introScreen" aria-hidden="true">
+    <div class="intro-inner">
+      <i class="intro-fox" data-fox></i>
+      <span class="intro-name">VOLPARIA</span>
+      <small class="intro-tag">SADE GİYİN · ASİL KAL</small>
+    </div>
+  </div>
   <a class="skip" href="#main">İçeriğe geç</a>
 
   <div id="storeView">
@@ -41,6 +49,7 @@
         <a data-nav-gender="erkek" href="kategori.html?cinsiyet=erkek">Erkek</a>
         <a data-nav-gender="unisex" href="kategori.html?cinsiyet=unisex">Unisex</a>
         <a data-nav-gender="cocuk" href="kategori.html?cinsiyet=cocuk">Çocuk</a>
+        <a class="kombin-link" href="kategori.html?kombin=1">🦊 Kombinler</a>
         <a href="kategori.html?filtre=new">Yeni Gelenler</a>
         <a class="sale-link" href="kategori.html?filtre=sale">İndirim</a>
       </nav>
@@ -118,6 +127,11 @@
       <button class="button dark" id="cookieAccept">Kabul et</button>
     </div>
   </div>
+
+  <aside class="restock-notice" id="restockNotice" role="status" hidden>
+    <header><b>🔔 Beklediğin ürün stoğa geldi!</b><button class="round-close" data-restock-close aria-label="Kapat">×</button></header>
+    <div class="restock-body"></div>
+  </aside>
 
   <div class="toast" id="toast" role="status"></div>
   <noscript>Bu mağazayı kullanmak için JavaScript'i etkinleştirin.</noscript>

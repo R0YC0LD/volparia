@@ -82,6 +82,83 @@
     });
     renderCategoryChips();
   }
+  /* ---------- kombinler ---------- */
+  function bundleCard(b) {
+    const members = bundleMembers(b), avail = bundleAvailable(b);
+    return `<article class="bundle-card ${avail ? "" : "soldout"}">
+      <button class="bundle-visual" data-bundle="${b.id}" style="--tone:${esc(b.tone || "#e8e2d6")}" aria-label="${esc(b.name)} kombinini incele">
+        <span class="bundle-badge">🦊 %${bundleDiscountPct(b)} indirim</span>
+        ${b.badge ? `<span class="badge right">${esc(b.badge)}</span>` : ""}
+        ${!avail ? `<span class="badge out">Kombin tükendi</span>` : ""}
+        <div class="bundle-thumbs">${members.slice(0, 3).map(p => `<span class="bundle-thumb" style="--tone:${esc(p.tone || "#e8e2d6")}">${p.imageUrl ? `<img src="${esc(p.imageUrl)}" alt="">` : hangerSvg}</span>`).join("")}</div>
+      </button>
+      <div class="bundle-meta">
+        <small>KOMBİN · ${members.length} PARÇA</small>
+        <h3>${esc(b.name)}</h3>
+        <div class="bundle-price"><strong>${money(bundlePrice(b))}</strong><del>${money(bundleGross(b))}</del></div>
+        <span class="bundle-save">Tek tek almaktansa ${money(bundleSavings(b))} kazan</span>
+        <button class="button dark full" data-bundle="${b.id}" ${avail ? "" : "disabled"}>${avail ? "Kombini incele →" : "Tükendi"}</button>
+      </div>
+    </article>`;
+  }
+  function renderBundles() {
+    const host = $("#bundleGrid"); if (!host) return;
+    const list = activeBundles();
+    const section = $("#bundles");
+    if (section) section.style.display = list.length ? "" : "none";
+    host.innerHTML = list.map(bundleCard).join("");
+  }
+  let bundleSizes = {};
+  function openBundle(id) {
+    const b = getBundle(id); if (!b) return;
+    bundleSizes = {};
+    bundleMembers(b).forEach(p => { const first = sizesOf(p).find(s => (Number(s.stock) || 0) > 0); bundleSizes[p.id] = first ? first.name : null; });
+    renderBundleDetail(b);
+    openLayer($("#productModal"));
+  }
+  function bundlePieceHtml(p) {
+    const out = isSoldOut(p);
+    return `<div class="bundle-piece-card">
+      <div class="bundle-piece-art" style="--tone:${esc(p.tone || "#e8e2d6")}">${p.imageUrl ? `<img src="${esc(p.imageUrl)}" alt="">` : hangerSvg}</div>
+      <div class="bundle-piece-info">
+        <small>${esc((p.brand || "").toUpperCase())} · ${esc(GENDERS[p.gender] || "")}</small>
+        <h4>${esc(p.name)}</h4>
+        <span class="piece-price">${money(p.price)}</span>
+        ${out ? `<span class="size-soldnote">Bu parça tükendi</span>` : `<div class="size-options mini">${sizesOf(p).map(s => { const st = Number(s.stock) || 0; return `<button class="size-option ${bundleSizes[p.id] === s.name ? "active" : ""}" data-bundle-size="${p.id}" data-size="${esc(s.name)}" ${st <= 0 ? "disabled" : ""} title="${st <= 0 ? "Tükendi" : st + " adet"}">${esc(s.name)}</button>`; }).join("")}</div>`}
+      </div>
+    </div>`;
+  }
+  function renderBundleDetail(b) {
+    const members = bundleMembers(b);
+    const ready = members.every(p => bundleSizes[p.id]);
+    $("#productDetail").innerHTML = `<button class="round-close modal-close" data-close>×</button>
+      <div class="bundle-detail">
+        <div class="bundle-detail-head">
+          <span class="eyebrow">🦊 KOMBİN · %${bundleDiscountPct(b)} İNDİRİM</span>
+          <h2>${esc(b.name)}</h2>
+          <p>${esc(b.description || "")}</p>
+          <div class="bundle-detail-price"><strong>${money(bundlePrice(b))}</strong><del>${money(bundleGross(b))}</del><span class="bundle-save">${money(bundleSavings(b))} tasarruf</span></div>
+        </div>
+        <div class="bundle-detail-note">Her parça için kendi bedenini seç; kombini indirimli fiyattan tek seferde sepete ekle.</div>
+        <div class="bundle-detail-pieces">${members.map(bundlePieceHtml).join("")}</div>
+        <button class="button dark full" id="bundleAdd" data-bundle-add="${b.id}" ${ready ? "" : "disabled"}>${ready ? `Kombini sepete ekle · ${money(bundlePrice(b))}` : "Her parça için beden seçin"}</button>
+      </div>`;
+  }
+  function addBundleToCart(id) {
+    const b = getBundle(id); if (!b) return;
+    for (const p of bundleMembers(b)) {
+      const sz = bundleSizes[p.id];
+      if (!sz) { toast(`${p.name} için beden seçin`, false); return; }
+      const s = sizeOf(p, sz);
+      if (!s || (Number(s.stock) || 0) <= 0) { toast(`${p.name} — ${sz} tükendi`, false); return; }
+    }
+    state.cart.push({ bundle: true, bundleId: id, sizes: { ...bundleSizes }, quantity: 1 });
+    persist(); renderHeader(); renderCart();
+    const cb = $("#cartButton"); if (cb) { cb.classList.remove("pop"); void cb.offsetWidth; cb.classList.add("pop"); setTimeout(() => cb.classList.remove("pop"), 520); }
+    toast(`${b.name} sepete eklendi`);
+    closeLayers(); openLayer($("#cartDrawer"));
+  }
+
   function renderSocial() {
     const host = $("#footerSocial"); if (!host) return;
     const s = state.settings;
@@ -105,8 +182,9 @@
     }
   }
   function renderAll() {
-    renderHeader(); renderGenders(); renderProducts(); renderCart(); renderFavorites(); renderSocial();
+    renderHeader(); renderGenders(); renderProducts(); renderBundles(); renderCart(); renderFavorites(); renderSocial();
     if (isCategoryPage) renderCategoryPage();
+    checkWatchlist();
   }
   window.onDataRefresh = renderAll;
 
@@ -132,6 +210,7 @@
       <div class="mega-side">
         ${Object.entries(GENDERS).map(([k, v]) => `<button data-mega-gender="${k}" class="${k === gender ? "active" : ""}">${v}<i>${genderProductCount(k)} ›</i></button>`).join("")}
         <div class="mega-side-sep"></div>
+        <a href="kategori.html?kombin=1" class="mega-kombin">🦊 Kombinler<i>›</i></a>
         <button data-mega-link="new">Yeni Gelenler<i>›</i></button>
         <button data-mega-link="sale">İndirimdekiler<i>›</i></button>
         <button data-mega-link="bestseller">Çok Satanlar<i>›</i></button>
@@ -160,6 +239,7 @@
     category: PARAMS.get("kategori") || "",
     filter: PARAMS.get("filtre") || "",
     q: PARAMS.get("ara") || "",
+    kombin: PARAMS.get("kombin") === "1",
     sizes: new Set(), inStock: false, sort: "featured"
   };
   const FILTER_LABEL = { new: "Yeni Gelenler", sale: "İndirimdekiler", bestseller: "Çok Satanlar" };
@@ -183,6 +263,7 @@
     return list;
   }
   function catTitle() {
+    if (catState.kombin) return "Kombinler";
     if (catState.category) return catState.category;
     if (catState.filter) return FILTER_LABEL[catState.filter] || "Ürünler";
     if (catState.gender) return `${GENDERS[catState.gender]} Koleksiyonu`;
@@ -200,12 +281,16 @@
   }
   function renderCatHead() {
     const crumbs = [`<a href="index.html">Ana Sayfa</a>`];
-    if (catState.gender) crumbs.push(`<span class="sep">/</span><a href="kategori.html?cinsiyet=${catState.gender}">${esc(GENDERS[catState.gender])}</a>`);
-    if (catState.category) crumbs.push(`<span class="sep">/</span><b>${esc(catState.category)}</b>`);
-    else if (catState.filter) crumbs.push(`<span class="sep">/</span><b>${esc(FILTER_LABEL[catState.filter] || "")}</b>`);
-    else if (!catState.gender) crumbs.push(`<span class="sep">/</span><b>Tüm Ürünler</b>`);
+    if (catState.kombin) crumbs.push(`<span class="sep">/</span><b>Kombinler</b>`);
+    else {
+      if (catState.gender) crumbs.push(`<span class="sep">/</span><a href="kategori.html?cinsiyet=${catState.gender}">${esc(GENDERS[catState.gender])}</a>`);
+      if (catState.category) crumbs.push(`<span class="sep">/</span><b>${esc(catState.category)}</b>`);
+      else if (catState.filter) crumbs.push(`<span class="sep">/</span><b>${esc(FILTER_LABEL[catState.filter] || "")}</b>`);
+      else if (!catState.gender) crumbs.push(`<span class="sep">/</span><b>Tüm Ürünler</b>`);
+    }
     $("#catBreadcrumb").innerHTML = crumbs.join("");
     $("#catTitle").textContent = catTitle();
+    if ($("#catSub")) $("#catSub").textContent = catState.kombin ? "Birlikte alınca kazandıran, özenle eşleştirilmiş parçalar." : "";
   }
   function renderCatSidebar() {
     const scope = catScope();
@@ -239,7 +324,20 @@
     if (catState.inStock) chips.push(["stok", "Stoktakiler"]);
     $("#catChips").innerHTML = chips.map(([type, label, val]) => `<span class="achip">${esc(label)}<button data-chip-remove="${type}" data-chip-val="${esc(val || "")}">×</button></span>`).join("");
   }
-  function renderCategoryPage() { renderCatHead(); renderCatSidebar(); renderCatGrid(); }
+  function renderCategoryPage() {
+    renderCatHead();
+    if (catState.kombin) {
+      const list = activeBundles();
+      $("#catSidebar").innerHTML = `<div class="filter-group"><h4>Kombinler</h4><p style="font-size:12.5px;color:var(--muted);line-height:1.6">Kombinler, birbirini tamamlayan parçaların indirimli paketleridir. İncele düğmesiyle her parçanın bedenini seçebilirsin.</p></div><div class="filter-group"><a class="filter-clear" href="kategori.html" style="text-decoration:none">← Tüm ürünlere dön</a></div>`;
+      $("#categoryGrid").innerHTML = list.length ? list.map(bundleCard).join("") : `<div class="empty">Şu an aktif kombin yok.</div>`;
+      $("#catCount").textContent = `${list.length} kombin`;
+      $("#catChips").innerHTML = "";
+      const sortSel = $("#catSort"); if (sortSel) sortSel.style.display = "none";
+      return;
+    }
+    const sortSel = $("#catSort"); if (sortSel) sortSel.style.display = "";
+    renderCatSidebar(); renderCatGrid();
+  }
 
   /* ---------- ürün detay ---------- */
   let detailQty = 1, detailSize = null;
@@ -265,6 +363,7 @@
           }).join("")}</div>
           <div id="sizeStockNote">${sizeNoteHtml(p, detailSize)}</div>
         </div>
+        ${watchRowHtml(p)}
         <div class="detail-qty"><b style="font-size:12px;letter-spacing:1px">ADET</b><div class="qty"><button data-detail-qty="-1">−</button><span id="detailQtyValue">1</span><button data-detail-qty="1">+</button></div></div>
         <button class="button dark full" id="detailAdd" data-add-to-cart="${p.id}" ${out || !detailSize ? "disabled" : ""}>${out ? "Bu ürün tükendi" : "Sepete ekle →"}</button>
         <div class="detail-list">
@@ -316,6 +415,11 @@
     }
     host.innerHTML = list.length ? list.map(r => `<article class="review-item"><div><b>${esc(r.name)}</b><span class="stars">${starFull.repeat(r.rating)}${starEmpty.repeat(5 - r.rating)}</span></div><p>${esc(r.comment)}</p><small>${dateTr(r.createdAt)}</small></article>`).join("") : `<div class="empty">Henüz onaylanmış yorum yok — ilk değerlendirmeyi sen yap.</div>`;
   }
+  function watchRowHtml(p) {
+    const sold = sizesOf(p).filter(s => (Number(s.stock) || 0) <= 0);
+    if (!sold.length) return "";
+    return `<div class="watch-row"><b>🔔 Tükenen bedenler için haber ver</b><div class="watch-sizes">${sold.map(s => { const on = state.watchlist.some(w => w.productId === p.id && w.size === s.name); return `<button class="watch-size ${on ? "watching" : ""}" data-watch="${p.id}" data-watch-size="${esc(s.name)}">${esc(s.name)}${on ? " ✓" : ""}</button>`; }).join("")}</div><small>Seçtiğin beden stoğa gelince, siteye girdiğinde bildirim alırsın.</small></div>`;
+  }
   function sizeNoteHtml(p, sizeName) {
     if (!sizeName) return isSoldOut(p) ? `<span class="size-soldnote">Bu ürünün tüm bedenleri tükendi.</span>` : "";
     const s = sizeOf(p, sizeName); if (!s) return "";
@@ -340,25 +444,56 @@
     const cb = $("#cartButton"); if (cb) { cb.classList.remove("pop"); void cb.offsetWidth; cb.classList.add("pop"); setTimeout(() => cb.classList.remove("pop"), 520); }
     toast(`${p.name} (${sizeName}) sepete eklendi`);
   }
-  function cartGross() { return state.cart.reduce((sum, l) => { const p = state.products.find(x => x.id === l.id); return sum + (p ? p.price * l.quantity : 0); }, 0); }
+  function lineUnitPrice(l) {
+    if (l.bundle) { const b = getBundle(l.bundleId); return b ? bundlePrice(b) : 0; }
+    const p = state.products.find(x => x.id === l.id); return p ? p.price : 0;
+  }
+  function lineFullPrice(l) {
+    if (l.bundle) { const b = getBundle(l.bundleId); return b ? bundleGross(b) : 0; }
+    return lineUnitPrice(l);
+  }
+  function cartGross() { return state.cart.reduce((s, l) => s + lineUnitPrice(l) * l.quantity, 0); }
+  function cartFull() { return state.cart.reduce((s, l) => s + lineFullPrice(l) * l.quantity, 0); }
   function cartTotals() {
-    const gross = cartGross();
+    const full = cartFull(), gross = cartGross();
+    const bundleSavings = full - gross;
     const discount = couponDiscount(gross);
-    return { gross, discount, total: Math.max(0, gross - discount) };
+    return { full, bundleSavings, gross, discount, total: Math.max(0, gross - discount) };
+  }
+  function bundleLineMax(l) {
+    const b = getBundle(l.bundleId); if (!b) return 0;
+    return Math.min(...bundleMembers(b).map(p => { const sz = (l.sizes || {})[p.id]; const s = sz && sizeOf(p, sz); return s ? Number(s.stock) || 0 : 0; }));
+  }
+  function cartLineHtml(l, i) {
+    if (l.bundle) {
+      const b = getBundle(l.bundleId); if (!b) return "";
+      const pieces = bundleMembers(b).map(p => `<span class="bundle-piece">${esc(p.name)} <b>[${esc((l.sizes || {})[p.id] || "?")}]</b></span>`).join("");
+      return `<article class="cart-line bundle-line">
+        <div class="line-art bundle-art" style="--tone:${esc(b.tone || "#e8e2d6")}">${foxMark}</div>
+        <div><small>KOMBİN · ${bundleMembers(b).length} PARÇA</small><h4>${esc(b.name)}</h4>
+        <div class="bundle-pieces">${pieces}</div>
+        <b>${money(bundlePrice(b))} <del style="font-weight:600;color:var(--muted);font-size:11px">${money(bundleGross(b))}</del></b>
+        <div class="qty"><button data-line-qty="${i}" data-delta="-1">−</button><span>${l.quantity}</span><button data-line-qty="${i}" data-delta="1">+</button></div></div>
+        <button class="remove" data-line-remove="${i}">×</button></article>`;
+    }
+    const p = state.products.find(x => x.id === l.id); if (!p) return "";
+    return `<article class="cart-line">
+      <div class="line-art" style="--tone:${esc(p.tone || "#e8e2d6")}">${p.imageUrl ? `<img src="${esc(p.imageUrl)}" alt="">` : hangerSvg}</div>
+      <div><small>${esc(p.brand || "")}</small><h4>${esc(p.name)}<span class="variant-tag">${esc(l.size)}</span></h4><b>${money(p.price)}</b>
+      <div class="qty"><button data-line-qty="${i}" data-delta="-1">−</button><span>${l.quantity}</span><button data-line-qty="${i}" data-delta="1">+</button></div></div>
+      <button class="remove" data-line-remove="${i}">×</button></article>`;
   }
   function renderCart() {
-    const lines = state.cart.map((l, i) => ({ ...l, index: i, product: state.products.find(p => p.id === l.id) })).filter(l => l.product);
-    $("#cartLines").innerHTML = lines.length ? lines.map(l => `<article class="cart-line">
-      <div class="line-art" style="--tone:${esc(l.product.tone || "#e8e2d6")}">${l.product.imageUrl ? `<img src="${esc(l.product.imageUrl)}" alt="">` : hangerSvg}</div>
-      <div><small>${esc(l.product.brand || "")}</small><h4>${esc(l.product.name)}<span class="variant-tag">${esc(l.size)}</span></h4><b>${money(l.product.price)}</b>
-      <div class="qty"><button data-line-qty="${l.index}" data-delta="-1">−</button><span>${l.quantity}</span><button data-line-qty="${l.index}" data-delta="1">+</button></div></div>
-      <button class="remove" data-line-remove="${l.index}">×</button></article>`).join("") : `<div class="empty"><b>Sepetin henüz boş.</b><p>Sana iyi gelecek parçaları keşfet.</p></div>`;
+    const valid = l => l.bundle ? getBundle(l.bundleId) : state.products.find(p => p.id === l.id);
+    const hasItems = state.cart.some(valid);
+    $("#cartLines").innerHTML = hasItems ? state.cart.map((l, i) => cartLineHtml(l, i)).join("") : `<div class="empty"><b>Sepetin henüz boş.</b><p>Sana iyi gelecek parçaları keşfet.</p></div>`;
     const t = cartTotals(), threshold = Number(state.settings.shippingThreshold) || 0;
     const remaining = Math.max(0, threshold - t.total), freeShip = threshold > 0 && !remaining, pct = threshold ? Math.min(100, t.total / threshold * 100) : 0;
-    $("#cartSummary").innerHTML = lines.length ? `
+    $("#cartSummary").innerHTML = hasItems ? `
       ${threshold ? `<p style="font-size:11.5px">${freeShip ? "Ücretsiz kargoyu kazandın! 🎉" : `Ücretsiz kargo için <b>${money(remaining)}</b> kaldı.`}</p><div class="progress"><i style="width:${freeShip ? 100 : pct}%"></i></div>` : ""}
       <div class="coupon-row">${state.coupon ? `<span class="coupon-chip">🏷 ${esc(state.coupon.code)}<button data-remove-coupon aria-label="Kuponu kaldır">×</button></span>` : `<input id="couponInput" placeholder="Kupon kodu" autocomplete="off"><button class="button outline" id="applyCoupon">Uygula</button>`}</div>
-      <div class="summary-row"><span>Ara toplam</span><b>${money(t.gross)}</b></div>
+      <div class="summary-row"><span>Ara toplam</span><b>${money(t.full)}</b></div>
+      ${t.bundleSavings ? `<div class="summary-row discount"><span>🦊 Kombin indirimi</span><b>−${money(t.bundleSavings)}</b></div>` : ""}
       ${t.discount ? `<div class="summary-row discount"><span>Kupon indirimi</span><b>−${money(t.discount)}</b></div>` : ""}
       <div class="summary-row"><span>Kargo</span><b>${freeShip ? "Ücretsiz" : "Ödeme adımında"}</b></div>
       <div class="summary-row total"><span>Toplam</span><b>${money(t.total)}</b></div>
@@ -442,11 +577,19 @@
     if (!$("#checkoutModal").classList.contains("show")) openLayer($("#checkoutModal"));
     if (step === 1) $("#addressForm").onsubmit = e => { e.preventDefault(); checkoutData = Object.fromEntries(new FormData(e.target)); checkout(2, checkoutData); };
   }
+  function expandCartItems() {
+    const items = [];
+    state.cart.forEach(l => {
+      if (l.bundle) { const b = getBundle(l.bundleId); if (!b) return; bundleMembers(b).forEach(p => items.push({ id: p.id, size: (l.sizes || {})[p.id], quantity: l.quantity, bundle: b.name })); }
+      else items.push({ id: l.id, size: l.size, quantity: l.quantity });
+    });
+    return items;
+  }
   async function finalizeOrder() {
     const form = checkoutData, payment = $("input[name=payment]:checked")?.value || "transfer";
     if (!form.email || !state.cart.length) { toast("Sipariş bilgileri eksik", false); return; }
     const t = cartTotals();
-    const order = { id: uid("ord"), orderNo: makeOrderNo(), customer: form, items: state.cart.map(x => ({ id: x.id, size: x.size, quantity: x.quantity })), total: t.total, discount: t.discount, coupon: state.coupon?.code || null, status: "new", paymentStatus: "awaiting", payment, createdAt: new Date().toISOString() };
+    const order = { id: uid("ord"), orderNo: makeOrderNo(), customer: form, items: expandCartItems(), total: t.total, discount: t.discount, bundleDiscount: t.bundleSavings, coupon: state.coupon?.code || null, status: "new", paymentStatus: "awaiting", payment, createdAt: new Date().toISOString() };
     if (state.apiOnline) {
       try { const result = await api("/api/orders", { method: "POST", body: JSON.stringify(order) }); Object.assign(order, result.order || {}); }
       catch (e) { toast(e.message, false); return; }
@@ -511,6 +654,42 @@
     $("#cookieEssential").addEventListener("click", () => decide("essential"));
   }
 
+  /* ---------- stok gelince haber ver (izleme listesi) ---------- */
+  function addWatch(productId, size) {
+    if (state.watchlist.some(w => w.productId === productId && w.size === size)) { toast("Bu beden için zaten haber listesindesin"); return; }
+    state.watchlist.push({ productId, size, addedAt: Date.now() });
+    persist();
+    toast("🔔 Stok gelince sana haber vereceğiz");
+  }
+  function checkWatchlist() {
+    if (!state.watchlist.length) return;
+    const back = [];
+    state.watchlist = state.watchlist.filter(w => {
+      const p = state.products.find(x => x.id === w.productId); if (!p) return false;
+      const s = sizeOf(p, w.size);
+      if (s && (Number(s.stock) || 0) > 0) { back.push({ product: p, size: w.size }); return false; }
+      return true;
+    });
+    if (back.length) { persist(); showRestockNotice(back); }
+  }
+  function showRestockNotice(items) {
+    const host = $("#restockNotice"); if (!host) return;
+    host.querySelector(".restock-body").innerHTML = items.map(it => `<button class="restock-item" data-product="${it.product.id}"><div class="line-art" style="--tone:${esc(it.product.tone || "#e8e2d6")}">${it.product.imageUrl ? `<img src="${esc(it.product.imageUrl)}" alt="">` : hangerSvg}</div><div><b>${esc(it.product.name)}</b><small>${esc(it.size)} bedeni yeniden stokta · ${money(it.product.price)}</small></div><span>→</span></button>`).join("");
+    host.hidden = false;
+    requestAnimationFrame(() => host.classList.add("show"));
+  }
+  function closeRestock() { const host = $("#restockNotice"); if (!host) return; host.classList.remove("show"); setTimeout(() => host.hidden = true, 350); }
+
+  /* ---------- tilki intro ekranı ---------- */
+  function initIntro() {
+    const el = $("#introScreen"); if (!el) return;
+    if (!document.documentElement.classList.contains("intro-pending")) { el.remove(); return; }
+    let closed = false;
+    const done = () => { if (closed) return; closed = true; el.classList.add("done"); document.documentElement.classList.remove("intro-pending"); setTimeout(() => el.remove(), 750); };
+    el.addEventListener("click", done);
+    setTimeout(done, 2500);
+  }
+
   /* ---------- olaylar ---------- */
   let logoClicks = 0, logoTimer;
   document.addEventListener("click", e => {
@@ -565,6 +744,12 @@
     if ((el = closest(".product-tabs button"))) { state.activeFilter = el.dataset.filter; $$(".product-tabs button").forEach(b => b.classList.toggle("active", b === el)); renderProducts(); return; }
     if ((el = closest("[data-favorite]"))) { const id = el.dataset.favorite; const i = state.favorites.indexOf(id); i >= 0 ? state.favorites.splice(i, 1) : state.favorites.push(id); persist(); renderHeader(); renderProducts(); renderFavorites(); return; }
     if ((el = closest("[data-page]"))) { showPage(el.dataset.page); return; }
+    if (closest("[data-restock-close]")) { closeRestock(); return; }
+    if ((el = closest(".restock-item"))) { closeRestock(); openProduct(el.dataset.product); return; }
+    if ((el = closest("[data-bundle]"))) { openBundle(el.dataset.bundle); return; }
+    if ((el = closest("[data-bundle-size]"))) { bundleSizes[el.dataset.bundleSize] = el.dataset.size; renderBundleDetail(getBundle($("#bundleAdd")?.dataset.bundleAdd)); return; }
+    if ((el = closest("[data-bundle-add]"))) { addBundleToCart(el.dataset.bundleAdd); return; }
+    if ((el = closest("[data-watch]"))) { addWatch(el.dataset.watch, el.dataset.watchSize); el.classList.add("watching"); if (!/✓/.test(el.textContent)) el.textContent = el.textContent + " ✓"; return; }
     if ((el = closest("[data-product]"))) { openProduct(el.dataset.product); return; }
 
     if ((el = closest("[data-size-pick]"))) {
@@ -586,12 +771,11 @@
     if ((el = closest("[data-add-to-cart]"))) { addToCart(el.dataset.addToCart, detailSize, detailQty); closeLayers(); openLayer($("#cartDrawer")); return; }
 
     if ((el = closest("[data-line-qty]"))) {
-      const line = state.cart[Number(el.dataset.lineQty)]; if (!line) return;
-      const p = state.products.find(x => x.id === line.id);
-      const max = p ? cartLineStock(p, line.size) : 99;
+      const idx = Number(el.dataset.lineQty), line = state.cart[idx]; if (!line) return;
+      const max = line.bundle ? bundleLineMax(line) : (() => { const p = state.products.find(x => x.id === line.id); return p ? cartLineStock(p, line.size) : 99; })();
       line.quantity += Number(el.dataset.delta);
-      if (line.quantity > max) { line.quantity = max; toast(`${line.size} bedeninden en fazla ${max} adet`, false); }
-      if (line.quantity <= 0) state.cart.splice(Number(el.dataset.lineQty), 1);
+      if (line.quantity > max) { line.quantity = max; toast(`Stok nedeniyle en fazla ${max} adet`, false); }
+      if (line.quantity <= 0) state.cart.splice(idx, 1);
       persist(); renderHeader(); renderCart(); return;
     }
     if ((el = closest("[data-line-remove]"))) { state.cart.splice(Number(el.dataset.lineRemove), 1); persist(); renderHeader(); renderCart(); return; }
@@ -649,6 +833,7 @@
   }
 
   /* ---------- başlangıç ---------- */
+  initIntro();
   renderAll();
   initMegaMenu();
   if (isCategoryPage) { updateCatUrl(true); const sortSel = $("#catSort"); if (sortSel) sortSel.value = catState.sort; }

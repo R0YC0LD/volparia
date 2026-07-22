@@ -9,6 +9,7 @@
     ["products", "Ürünler"],
     ["stock", "Stok / Bedenler"],
     ["orders", "Siparişler"],
+    ["bundles", "Kombinler"],
     ["pos", "Sanal POS"],
     ["coupons", "Kuponlar"],
     ["reviews", "Yorumlar"],
@@ -86,7 +87,7 @@
     const host = $("#adminContent");
     const views = {
       dashboard: dashboardHtml, products: productsHtml, stock: stockHtml, orders: ordersHtml,
-      pos: posHtml, coupons: couponsHtml, reviews: reviewsHtml, customers: customersHtml, categories: categoriesHtml,
+      bundles: bundlesHtml, pos: posHtml, coupons: couponsHtml, reviews: reviewsHtml, customers: customersHtml, categories: categoriesHtml,
       content: contentHtml, newsletter: newsletterHtml, seo: seoHtml, settings: settingsHtml,
       backups: backupsHtml, audit: auditHtml
     };
@@ -257,6 +258,96 @@
     </div>`;
   }
   function productName(id) { const p = state.products.find(x => x.id === id); return p ? p.name : "Ürün"; }
+
+  /* ---------- kombinler ---------- */
+  function bundlesHtml() {
+    const bundles = getBundles();
+    const products = adminProducts().filter(p => p.active !== false);
+    if (state.admin.bundleEdit !== null && state.admin.bundleEdit !== undefined) return bundleFormHtml(state.admin.bundleEdit, products);
+    return `<div class="admin-panel">
+      <div class="admin-toolbar"><h3 style="margin:0">Kombinler (${bundles.length})</h3><span class="grow"></span><button class="button dark" data-new-bundle ${products.length < 2 ? "disabled" : ""}>+ Yeni kombin</button></div>
+      <p class="form-note" style="margin-bottom:16px">Kombin, birbirini tamamlayan 2-4 ürünü indirimli bir paket olarak sunar. Müşteri her parçanın bedenini kendi seçer; kombin vitrinde "Kombinler" bölümünde ve mega-menüde görünür.</p>
+      ${bundles.length ? `<div style="overflow-x:auto"><table class="admin-table"><thead><tr><th>KOMBİN</th><th>PARÇALAR</th><th>LİSTE</th><th>İNDİRİM</th><th>KOMBİN FİYATI</th><th>DURUM</th><th style="text-align:right"></th></tr></thead><tbody>
+      ${bundles.map(b => {
+        const members = bundleMembers(b);
+        return `<tr>
+          <td><b>${esc(b.name)}</b>${b.badge ? `<br><span class="pill dim">${esc(b.badge)}</span>` : ""}</td>
+          <td><small style="color:var(--muted)">${members.map(p => esc(p.name)).join(" + ") || "—"}</small></td>
+          <td>${money(bundleGross(b))}</td>
+          <td><span class="pill warn">%${bundleDiscountPct(b)}</span></td>
+          <td><b>${money(bundlePrice(b))}</b><br><small style="color:var(--ok)">${money(bundleSavings(b))} kazanç</small></td>
+          <td>${b.active !== false ? (bundleAvailable(b) ? `<span class="pill ok">Yayında</span>` : `<span class="pill bad">Stok yok</span>`) : `<span class="pill dim">Pasif</span>`}</td>
+          <td class="mini-actions"><button data-edit-bundle="${esc(b.id)}">Düzenle</button><button class="danger" data-delete-bundle="${esc(b.id)}">Sil</button></td>
+        </tr>`;
+      }).join("")}</tbody></table></div>` : `<div class="empty">Henüz kombin yok. En az 2 ürün seçerek ilk kombinini oluştur.</div>`}
+    </div>`;
+  }
+  function bundleFormHtml(id, products) {
+    const isNew = id === "new";
+    const b = isNew ? { id: uid("b"), name: "", description: "", productIds: [], discountPercent: 15, badge: "Kombin", tone: "#e8e2d6", active: true } : getBundle(id) || { productIds: [] };
+    const selected = new Set(b.productIds || []);
+    const preview = bundleMembers({ productIds: [...selected] });
+    const gross = preview.reduce((s, p) => s + (Number(p.price) || 0), 0);
+    const disc = Math.max(0, Math.min(90, Number(b.discountPercent) || 0));
+    const price = Math.round(gross * (100 - disc) / 100);
+    return `<div class="admin-panel"><h3>${isNew ? "Yeni kombin oluştur" : `Düzenle: ${esc(b.name)}`}</h3>
+      <form id="bundleForm" class="form-grid" data-bundle-id="${esc(b.id)}" data-is-new="${isNew}">
+        <label class="field">Kombin adı *<input name="name" required value="${esc(b.name)}" placeholder="Ofis Şıklığı Kombini"></label>
+        <label class="field">Rozet (ops.)<input name="badge" value="${esc(b.badge || "")}" placeholder="Kombin / Çok Tutulan"></label>
+        <label class="field">İndirim oranı (%)<input name="discountPercent" type="number" min="0" max="90" value="${esc(b.discountPercent ?? 15)}" id="bundleDiscInput"></label>
+        <label class="field">Kart zemin rengi<input name="tone" type="color" value="${esc(b.tone || "#e8e2d6")}" style="height:44px;padding:4px"></label>
+        <label class="field full">Açıklama<textarea name="description" rows="2">${esc(b.description || "")}</textarea></label>
+        <div class="field full"><span>Kombine dahil ürünler (2-4 adet seç) *</span>
+          <div class="bundle-picker" id="bundlePicker">
+            ${products.map(p => `<label class="bundle-pick ${selected.has(p.id) ? "on" : ""}"><input type="checkbox" name="member" value="${esc(p.id)}" ${selected.has(p.id) ? "checked" : ""}><span class="bp-thumb" style="--tone:${esc(p.tone || "#e8e2d6")}">${p.imageUrl ? `<img src="${esc(p.imageUrl)}" alt="">` : hangerSvg}</span><span class="bp-info"><b>${esc(p.name)}</b><small>${esc(p.sku)} · ${money(p.price)}</small></span></label>`).join("")}
+          </div>
+        </div>
+        <div class="field full"><div class="bundle-price-preview" id="bundlePreview">
+          <span>Liste: <b>${money(gross)}</b></span><span>İndirim: <b>%${disc}</b></span><span>Kombin fiyatı: <b class="accent">${money(price)}</b></span><span class="save">Kazanç: <b>${money(gross - price)}</b></span>
+        </div></div>
+        <label class="field"><span class="check-row"><input type="checkbox" name="active" ${b.active !== false ? "checked" : ""}>Yayında</span></label>
+        <div class="admin-form-actions">
+          <button type="button" class="button outline" data-cancel-bundle>Vazgeç</button>
+          <button type="submit" class="button dark">${isNew ? "Kombini oluştur" : "Değişiklikleri kaydet"}</button>
+        </div>
+      </form></div>`;
+  }
+  function recalcBundlePreview() {
+    const form = $("#bundleForm"); if (!form) return;
+    const ids = $$("input[name=member]:checked", form).map(i => i.value);
+    const members = ids.map(id => adminProducts().find(p => p.id === id)).filter(Boolean);
+    const gross = members.reduce((s, p) => s + (Number(p.price) || 0), 0);
+    const disc = Math.max(0, Math.min(90, Number($("#bundleDiscInput").value) || 0));
+    const price = Math.round(gross * (100 - disc) / 100);
+    $("#bundlePreview").innerHTML = `<span>Liste: <b>${money(gross)}</b></span><span>İndirim: <b>%${disc}</b></span><span>Kombin fiyatı: <b class="accent">${money(price)}</b></span><span class="save">Kazanç: <b>${money(gross - price)}</b></span>`;
+    $$(".bundle-pick", form).forEach(l => l.classList.toggle("on", l.querySelector("input").checked));
+  }
+  async function saveBundleForm(form) {
+    const fd = new FormData(form);
+    const ids = fd.getAll("member").map(String);
+    if (ids.length < 2) { toast("En az 2 ürün seçin", false); return; }
+    if (ids.length > 4) { toast("En fazla 4 ürün seçebilirsiniz", false); return; }
+    const name = String(fd.get("name")).trim();
+    if (!name) { toast("Kombin adı zorunlu", false); return; }
+    const bundle = {
+      id: form.dataset.bundleId, name, description: String(fd.get("description")).trim(),
+      productIds: ids, discountPercent: Math.max(0, Math.min(90, Number(fd.get("discountPercent")) || 0)),
+      badge: String(fd.get("badge")).trim() || null, tone: String(fd.get("tone")) || "#e8e2d6", active: Boolean(fd.get("active"))
+    };
+    const bundles = getBundles().filter(x => x.id !== bundle.id);
+    bundles.push(bundle);
+    const ok = await saveSettingsPartial({ bundles });
+    if (!ok) return;
+    state.admin.bundleEdit = null;
+    renderAdmin(); toast("Kombin kaydedildi");
+  }
+  async function deleteBundle(id) {
+    const b = getBundle(id); if (!b) return;
+    if (!confirm(`"${b.name}" kombini silinsin mi?`)) return;
+    const ok = await saveSettingsPartial({ bundles: getBundles().filter(x => x.id !== id) });
+    if (!ok) return;
+    renderAdmin(); toast("Kombin silindi");
+  }
 
   /* ---------- sanal pos ---------- */
   function posHtml() {
@@ -674,6 +765,11 @@
   }
   function bindForms() {
     const pf = $("#productForm"); if (pf) pf.onsubmit = e => { e.preventDefault(); saveProductForm(pf); };
+    const bf = $("#bundleForm"); if (bf) {
+      bf.onsubmit = e => { e.preventDefault(); saveBundleForm(bf); };
+      bf.addEventListener("change", e => { if (e.target.name === "member" || e.target.id === "bundleDiscInput") recalcBundlePreview(); });
+      bf.addEventListener("input", e => { if (e.target.id === "bundleDiscInput") recalcBundlePreview(); });
+    }
     const sf = $("#settingsForm"); if (sf) sf.onsubmit = async e => {
       e.preventDefault();
       const fd = new FormData(sf);
@@ -773,6 +869,10 @@
     if (closest("#adminLogout")) { state.token = ""; sessionStorage.removeItem("volparia_admin_token"); showLogin(); return; }
     if ((el = closest("[data-admin-view]"))) { state.adminView = el.dataset.adminView; state.admin.editing = null; renderAdmin(); return; }
     if (closest("[data-new-product]")) { state.adminView = "products"; state.admin.editing = "new"; renderAdmin(); return; }
+    if (closest("[data-new-bundle]")) { state.admin.bundleEdit = "new"; renderAdmin(); return; }
+    if ((el = closest("[data-edit-bundle]"))) { state.admin.bundleEdit = el.dataset.editBundle; renderAdmin(); return; }
+    if (closest("[data-cancel-bundle]")) { state.admin.bundleEdit = null; renderAdmin(); return; }
+    if ((el = closest("[data-delete-bundle]"))) { deleteBundle(el.dataset.deleteBundle); return; }
     if ((el = closest("[data-edit-product]"))) { state.adminView = "products"; state.admin.editing = el.dataset.editProduct; renderAdmin(); return; }
     if (closest("[data-cancel-edit]")) { state.admin.editing = null; renderAdmin(); return; }
     if ((el = closest("[data-delete-product]"))) { deleteProductById(el.dataset.deleteProduct); return; }

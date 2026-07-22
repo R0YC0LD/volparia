@@ -33,6 +33,28 @@ Varsayılan giriş: kullanıcı adı `admin`, şifre `12345`
 - **Yedekleme** — tüm veriyi tek JSON dosyası olarak indirme / geri yükleme
 - **Denetim Kaydı** — bulutta kim ne zaman ne değiştirdi (bulut kurulunca aktif)
 
+## Kombinler (birlikte satış)
+
+Admin panelinde **Kombinler** modülünden 2-4 ürünü seçip indirimli bir paket oluşturursunuz:
+- İndirim oranını siz belirlersiniz; liste fiyatı, kombin fiyatı ve kazanç anında hesaplanır.
+- Kombin mağazada ana sayfadaki **"Kombinle kazan"** bölümünde, üst menüdeki
+  **🦊 Kombinler** bağlantısında ve mega-menüde görünür.
+- Müşteri kombini açınca **her parça için kendi bedenini** seçer ve indirimli fiyattan
+  tek seferde sepete ekler. Sepette liste fiyatı, kombin indirimi ve toplam ayrı ayrı gösterilir.
+
+## Stok gelince haber verme
+
+Bir bedeni tükenen üründe müşteri, ürün detayındaki **"🔔 Stok gelince haber ver"**
+bölümünden o bedeni işaretler. Siz stoğu (admin → Stok) yenileyince, müşteri siteye
+tekrar girdiğinde sol altta **"Beklediğin ürün stoğa geldi!"** bildirimi açılır.
+(E-posta bildirimi, e-posta servisi bulut kurulumunda tanımlanınca eklenebilir.)
+
+## Giriş (intro) ekranı
+
+Siteye ilk girişte tilki logolu **VOLPARIA intro ekranı** açılır ve birkaç saniyede kapanır.
+Sekme kapatılıp yeniden girildiğinde tekrar gösterilir; site içinde gezerken, sepete/favoriye
+eklerken veya sipariş verirken **gösterilmez** (oturum boyunca bir kez).
+
 ## Sanal POS (kartla ödeme) — otomatik aktifleşir
 
 Kartla ödeme almak için bulut kurulumunun tamamlanmış olması gerekir. Sonrası çok basit:

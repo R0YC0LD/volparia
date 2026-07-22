@@ -316,6 +316,8 @@ async function createOrder(request, env, cors) {
     const result = await findCoupon(env, String(data.coupon).trim().toUpperCase(), gross);
     if (result.coupon) { discount = result.coupon.discount; couponCode = result.coupon.code; }
   }
+  const bundleDiscount = Math.max(0, Math.min(gross, Math.round(Number(data.bundleDiscount) || 0)));
+  discount = Math.min(gross, discount + bundleDiscount);
   const total = Math.max(0, gross - discount);
   const method = ["card", "cod", "transfer"].includes(data.payment) ? data.payment : "transfer";
   const statements = [
@@ -384,6 +386,16 @@ async function saveSettings(request, env, actor, cors) {
     seoTitle: String(data.seoTitle || "").slice(0, 80), seoDescription: String(data.seoDescription || "").slice(0, 180),
     instagram: String(data.instagram || "").slice(0, 200), tiktok: String(data.tiktok || "").slice(0, 200),
     twitter: String(data.twitter || "").slice(0, 200), whatsapp: String(data.whatsapp || "").slice(0, 40),
+    bundles: (Array.isArray(data.bundles) ? data.bundles : []).slice(0, 40).map(b => ({
+      id: (String(b.id || "").slice(0, 40)) || `b_${crypto.randomUUID().slice(0, 8)}`,
+      name: String(b.name || "").slice(0, 120),
+      description: String(b.description || "").slice(0, 500),
+      productIds: (Array.isArray(b.productIds) ? b.productIds : []).slice(0, 4).map(String),
+      discountPercent: Math.max(0, Math.min(90, Math.round(Number(b.discountPercent) || 0))),
+      badge: b.badge ? String(b.badge).slice(0, 40) : null,
+      tone: /^#[0-9a-fA-F]{6}$/.test(b.tone) ? b.tone : "#e8e2d6",
+      active: b.active !== false
+    })).filter(b => b.name && b.productIds.length >= 2),
     pages
   };
   await env.DB.prepare("INSERT INTO store_settings(key,value,updated_at) VALUES('store',?,CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=CURRENT_TIMESTAMP").bind(JSON.stringify(safe)).run();
