@@ -50,12 +50,19 @@
       return `<span class="size-chip ${cls}" title="${st <= 0 ? `${esc(s.name)} bedeni tükendi` : `${esc(s.name)}: ${st} adet`}">${esc(s.name)}</span>`;
     }).join("")}</div>`;
   }
+  function productBadges(p) {
+    const b = [];
+    if (p.oldPrice && Number(p.oldPrice) > p.price) b.push(`<span class="pbadge sale">%${Math.round((1 - p.price / p.oldPrice) * 100)}</span>`);
+    const label = p.badge || ((p.tags || []).includes("new") ? "Yeni" : "");
+    if (label) b.push(`<span class="pbadge">${esc(label)}</span>`);
+    return b.length ? `<div class="pbadges">${b.join("")}</div>` : "";
+  }
   function productCard(p) {
     const fav = state.favorites.includes(p.id);
     const out = isSoldOut(p), low = isLowStock(p), t = totalStock(p), r = ratingInfo(p);
     return `<article class="product-card ${out ? "soldout" : ""}">
       <button class="product-art" data-product="${p.id}" style="--tone:${esc(p.tone || "#e8e2d6")}" aria-label="${esc(p.name)} detayını aç">
-        ${p.badge ? `<span class="badge ${(p.tags || []).includes("sale") ? "sale" : ""}">${esc(p.badge)}</span>` : ""}
+        ${productBadges(p)}
         ${out ? `<span class="badge out">Tükendi</span>` : ""}
         ${low ? `<span class="badge-flame"><i>🔥</i>Son ${t} ürün</span>` : ""}
         ${productArt(p)}
@@ -156,9 +163,28 @@
     persist(); renderHeader(); renderCart();
     const cb = $("#cartButton"); if (cb) { cb.classList.remove("pop"); void cb.offsetWidth; cb.classList.add("pop"); setTimeout(() => cb.classList.remove("pop"), 520); }
     toast(`${b.name} sepete eklendi`);
-    closeLayers(); openLayer($("#cartDrawer"));
+    openLayer($("#cartDrawer"));
   }
 
+  function renderMobileMenu() {
+    const host = $("#mobileNav"); if (!host) return;
+    const cats = getCategories();
+    host.innerHTML = `
+      <a href="kategori.html">Tüm Ürünler</a>
+      <span class="md-label">CİNSİYET</span>
+      ${Object.entries(GENDERS).map(([k, v]) => `<a href="kategori.html?cinsiyet=${k}">${esc(v)}</a>`).join("")}
+      <span class="md-label">KATEGORİLER</span>
+      ${cats.map(c => `<a href="kategori.html?kategori=${encodeURIComponent(c)}">${esc(c)}</a>`).join("")}
+      <span class="md-label">KEŞFET</span>
+      <a class="md-accent" href="kategori.html?kombin=1">🦊 Kombinler</a>
+      <a href="kategori.html?filtre=new">Yeni Gelenler</a>
+      <a class="md-sale" href="kategori.html?filtre=sale">İndirim</a>
+      <span class="md-label">YARDIM</span>
+      <button data-page="shipping">Kargo ve teslimat</button>
+      <button data-page="returns">İade ve değişim</button>
+      <button data-page="sizes">Beden rehberi</button>
+      <button data-page="contact">İletişim</button>`;
+  }
   function renderSocial() {
     const host = $("#footerSocial"); if (!host) return;
     const s = state.settings;
@@ -687,7 +713,7 @@
     let closed = false;
     const done = () => { if (closed) return; closed = true; el.classList.add("done"); document.documentElement.classList.remove("intro-pending"); setTimeout(() => el.remove(), 750); };
     el.addEventListener("click", done);
-    setTimeout(done, 2500);
+    setTimeout(done, 2900);
   }
 
   /* ---------- olaylar ---------- */
@@ -725,9 +751,10 @@
       else if (t === "beden") catState.sizes.delete(el.dataset.chipVal);
       updateCatUrl(); renderCategoryPage(); return;
     }
-    if (closest("[data-cat-filter-close]")) { $("#catSidebar").classList.remove("show"); $("#overlay").classList.remove("show"); document.body.classList.remove("locked"); return; }
-    if (closest("#filterToggle")) { $("#catSidebar").classList.add("show"); $("#overlay").classList.add("show"); document.body.classList.add("locked"); return; }
+    if (closest("[data-cat-filter-close]")) { closeLayers(); return; }
+    if (closest("#filterToggle")) { openLayer($("#catSidebar")); return; }
 
+    if (closest("#mobileMenu")) { renderMobileMenu(); openLayer($("#mobileDrawer")); return; }
     if (closest("#searchTrigger") || closest("#searchMobile")) { openSearch(); return; }
     if (closest("#favoritesButton")) { renderFavorites(); openLayer($("#favoriteDrawer")); return; }
     if (closest("#cartButton")) { renderCart(); openLayer($("#cartDrawer")); return; }
@@ -768,7 +795,7 @@
       $("#detailQtyValue").textContent = detailQty;
       return;
     }
-    if ((el = closest("[data-add-to-cart]"))) { addToCart(el.dataset.addToCart, detailSize, detailQty); closeLayers(); openLayer($("#cartDrawer")); return; }
+    if ((el = closest("[data-add-to-cart]"))) { addToCart(el.dataset.addToCart, detailSize, detailQty); openLayer($("#cartDrawer")); return; }
 
     if ((el = closest("[data-line-qty]"))) {
       const idx = Number(el.dataset.lineQty), line = state.cart[idx]; if (!line) return;

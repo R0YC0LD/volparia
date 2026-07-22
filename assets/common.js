@@ -30,6 +30,7 @@ const ICONS = {
   backups: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10m0 0 4-4m-4 4-4-4"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>`,
   audit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.2 2"/></svg>`,
   pos: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 9.5h18M7 15h4"/></svg>`,
+  bundles: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 20 7v10l-8 3.5L4 17V7l8-3.5z"/><path d="M4 7l8 3.5L20 7M12 10.5V20"/><path d="M8 5.2 16 8.8"/></svg>`,
   instagram: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg>`,
   tiktok: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4v10.5a4 4 0 1 1-3.5-4"/><path d="M14.5 5.5c.8 2 2.4 3.2 4.5 3.5"/></svg>`,
   twitter: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m4 4 7 9.5L4.5 20M20 4l-6.6 7.5M13.4 11.5 20 20h-4.5L11 13.5"/></svg>`,
@@ -134,8 +135,20 @@ function persist() {
 }
 let toastTimer;
 function toast(text, ok = true) { const el = $("#toast"); if (!el) return; el.textContent = `${ok ? "✓" : "!"} ${text}`; el.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("show"), 2800); }
-function openLayer(el) { closeLayers(); $("#overlay")?.classList.add("show"); el.classList.add("show"); document.body.classList.add("locked"); }
-function closeLayers() { $$(".drawer.show,.modal.show,.search-modal.show").forEach(el => el.classList.remove("show")); $("#overlay")?.classList.remove("show"); document.body.classList.remove("locked"); }
+/* Katmanlar (modal/çekmece) tarayıcı geçmişine bağlanır: geri tuşu siteden çıkmak yerine
+   açık katmanı kapatır. Böylece kategori → ürün → beden akışında geri, bir önceki adıma döner. */
+let _layerOpen = false;
+function _closeLayersDom() { $$(".drawer.show,.modal.show,.search-modal.show,.mobile-drawer.show,.cat-sidebar.show").forEach(el => el.classList.remove("show")); $("#overlay")?.classList.remove("show"); document.body.classList.remove("locked"); }
+function openLayer(el) {
+  _closeLayersDom();
+  $("#overlay")?.classList.add("show"); el.classList.add("show"); document.body.classList.add("locked");
+  if (!_layerOpen) { _layerOpen = true; try { history.pushState({ vlayer: true }, ""); } catch { } }
+}
+function closeLayers() {
+  if (_layerOpen) { try { history.back(); } catch { _layerOpen = false; _closeLayersDom(); } }
+  else _closeLayersDom();
+}
+window.addEventListener("popstate", () => { if (_layerOpen) { _layerOpen = false; _closeLayersDom(); } });
 
 /* ---------- API ---------- */
 async function api(path, options = {}) {

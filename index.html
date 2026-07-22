@@ -15,10 +15,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>try{if(!sessionStorage.getItem("volparia_intro")){document.documentElement.classList.add("intro-pending");sessionStorage.setItem("volparia_intro","1");}}catch(e){}</script>
-  <link rel="stylesheet" href="assets/site.css?v=7">
-  <script src="config.js?v=7"></script>
-  <script src="assets/common.js?v=7" defer></script>
-  <script src="assets/store.js?v=7" defer></script>
+  <link rel="stylesheet" href="assets/site.css?v=8">
+  <script src="config.js?v=8"></script>
+  <script src="assets/common.js?v=8" defer></script>
+  <script src="assets/store.js?v=8" defer></script>
 </head>
 <body>
   <div class="intro-screen" id="introScreen" aria-hidden="true">
@@ -161,6 +161,11 @@
   </div>
 
   <div class="overlay" id="overlay"></div>
+
+  <aside class="mobile-drawer" id="mobileDrawer" aria-label="Menü">
+    <header><div class="md-brand"><i class="brand-mark" data-fox></i>VOLPARIA</div><button class="round-close" data-close>×</button></header>
+    <nav id="mobileNav"></nav>
+  </aside>
 
   <aside class="drawer" id="cartDrawer" aria-label="Sepet"><header><div><span class="eyebrow">ALIŞVERİŞ ÇANTAN</span><h2>Sepetim</h2></div><button class="round-close" data-close>×</button></header><div id="cartLines" class="cart-lines"></div><div class="cart-summary" id="cartSummary"></div></aside>
   <aside class="drawer" id="favoriteDrawer" aria-label="Favoriler"><header><div><span class="eyebrow">KAYDETTİKLERİN</span><h2>Favorilerim</h2></div><button class="round-close" data-close>×</button></header><div id="favoriteLines" class="favorite-lines"></div></aside>
