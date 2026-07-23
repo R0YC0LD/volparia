@@ -11,8 +11,11 @@ database_id = "BURAYA-D1-DATABASE-ID-GELECEK"
 [vars]
 # Kart ödemesi sonrası müşterinin geri yönlendirileceği mağaza adresi
 STOREFRONT_URL = "https://r0yc0ld.github.io/volparia/"
+# Virgülle ayrılmış CORS izin listesi. Özel alan adı kullanırsanız onu da ekleyin.
+ALLOWED_ORIGINS = "https://r0yc0ld.github.io"
 
 # Gizli değerler dosyaya YAZILMAZ, şu komutlarla eklenir:
 #   wrangler secret put ADMIN_PASSWORD
 #   wrangler secret put SESSION_SECRET
-# İsteğe bağlı: ADMIN_USERNAME (varsayılan: admin)
+# ADMIN_PASSWORD en az 12, SESSION_SECRET en az 32 karakter olmalıdır.
+# İsteğe bağlı: ADMIN_USERNAME (varsayılan: admin; değiştirilmesi önerilir)

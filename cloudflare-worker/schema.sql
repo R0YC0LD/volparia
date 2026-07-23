@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS orders (
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_order_no ON orders(order_no);
 
 CREATE TABLE IF NOT EXISTS order_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -106,4 +107,13 @@ CREATE TABLE IF NOT EXISTS audit_log (
   entity_id TEXT,
   metadata TEXT DEFAULT '{}',
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- IP adresi HMAC ile özetlenerek kaba kuvvet ve istek kötüye kullanımı sınırlandırılır.
+CREATE TABLE IF NOT EXISTS request_limits (
+  key TEXT PRIMARY KEY,
+  request_count INTEGER NOT NULL DEFAULT 0,
+  window_started INTEGER NOT NULL,
+  blocked_until INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );

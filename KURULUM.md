@@ -13,8 +13,10 @@ Yönetim paneli ayrı bir sayfadır: **`admin.html`**
 1. Doğrudan `admin.html` dosyasını açın (siteyse `siteadresi/admin.html`),
 2. veya mağazada **VOLPARIA logosuna arka arkaya 5 kez** tıklayın.
 
-Varsayılan giriş: kullanıcı adı `admin`, şifre `12345`
-(Bulut kurulduktan sonra şifre, Cloudflare'a eklediğiniz `ADMIN_PASSWORD` olur — güçlü bir şifre seçin.)
+Güvenlik nedeniyle yönetim paneli yalnızca Cloudflare Worker bağlandıktan sonra açılır.
+Kullanıcı adı varsayılan olarak `admin` olsa da `ADMIN_USERNAME` ile değiştirmeniz önerilir.
+Şifre, Cloudflare'a gizli değer olarak eklediğiniz `ADMIN_PASSWORD` değeridir; kaynak
+dosyalarında veya `config.js` içinde hiçbir şifre/anahtar tutulmaz.
 
 ## Admin panelinde neler var? (14 modül)
 
@@ -137,14 +139,16 @@ cd "C:\Users\ongor\OneDrive\Desktop\Giyim Mağazası\cloudflare-worker"
 wrangler d1 create volparia-db
 
 # 5) wrangler.toml.example dosyasını wrangler.toml adıyla kopyalayıp
-#    içindeki database_id alanına 4. adımdaki değeri yapıştırın
+#    database_id alanını doldurun. STOREFRONT_URL ve ALLOWED_ORIGINS
+#    değerlerinin yayımlanan mağaza adresinizle eşleştiğini doğrulayın.
 
 # 6) Veritabanı tablolarını kurun
 wrangler d1 execute volparia-db --remote --file=schema.sql
 
-# 7) Yönetici şifresi ve oturum anahtarı ekleyin (sorulduğunda yazın)
+# 7) Yönetici adı, güçlü şifre ve oturum anahtarı ekleyin (sorulduğunda yazın)
+wrangler secret put ADMIN_USERNAME   # "admin" yerine tahmin edilmesi zor bir ad önerilir
 wrangler secret put ADMIN_PASSWORD
-wrangler secret put SESSION_SECRET   # uzun rastgele bir metin girin
+wrangler secret put SESSION_SECRET   # en az 32 karakterlik rastgele bir değer
 
 # 8) Yayınlayın — çıktıda https://volparia-api.XXXX.workers.dev gibi bir adres verir
 wrangler deploy
@@ -161,6 +165,10 @@ apiBase: "https://volparia-api.XXXX.workers.dev",
 Bu kadar. Artık siteyi hangi cihazda açarsanız açın, ürün/stok/sipariş
 değişiklikleri birkaç saniye içinde her yerde görünür
 (yenileme sıklığı `config.js` içindeki `syncIntervalMs` ile ayarlanır).
+
+> Güvenlik güncellemesinden sonra mevcut bir kurulumu yükseltiyorsanız, yeni istek
+> sınırlama tablosunu eklemek için 6. adımdaki `wrangler d1 execute ...` komutunu
+> yeniden çalıştırın; `CREATE TABLE IF NOT EXISTS` mevcut verileri silmez.
 
 ## Siteyi internete açmak (ücretsiz)
 

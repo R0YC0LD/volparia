@@ -34,18 +34,13 @@
     }
     return false;
   }
-  function showLogin() { sessionStorage.removeItem("volparia_local_admin"); $("#adminApp").classList.remove("show"); $("#adminLogin").classList.add("show"); setTimeout(() => $("#adminUsername").focus(), 100); }
-  function showAdmin() { if (!CONFIG.apiBase) sessionStorage.setItem("volparia_local_admin", "1"); $("#adminLogin").classList.remove("show"); $("#adminApp").classList.add("show"); state.adminView = "dashboard"; loadAdminData(); renderAdmin(); }
+  function showLogin() { $("#adminApp").classList.remove("show"); $("#adminLogin").classList.add("show"); setTimeout(() => $("#adminUsername").focus(), 100); }
+  function showAdmin() { $("#adminLogin").classList.remove("show"); $("#adminApp").classList.add("show"); state.adminView = "dashboard"; loadAdminData(); renderAdmin(); }
   async function login(username, password) {
-    if (CONFIG.apiBase) {
-      try {
-        const data = await api("/api/auth/login", { method: "POST", body: JSON.stringify({ username, password }) });
-        state.token = data.token; sessionStorage.setItem("volparia_admin_token", data.token);
-        state.apiOnline = true; setStorageIndicator(true); showAdmin(); return;
-      } catch (err) { if (!err.network) throw err; state.apiOnline = false; setStorageIndicator(false); }
-    }
-    if (username !== "admin" || password !== "12345") throw new Error("Kullanıcı adı veya şifre hatalı");
-    showAdmin();
+    if (!CONFIG.apiBase) throw new Error("Güvenli yönetim için Cloudflare Worker bağlantısını yapılandırın");
+    const data = await api("/api/auth/login", { method: "POST", body: JSON.stringify({ username, password }) });
+    state.token = data.token; sessionStorage.setItem("volparia_admin_token", data.token);
+    state.apiOnline = true; setStorageIndicator(true); showAdmin();
   }
 
   /* ---------- veri ---------- */
@@ -943,7 +938,6 @@
   (async () => {
     await bootstrapData();
     if (state.token && state.apiOnline) showAdmin();
-    else if (!CONFIG.apiBase && sessionStorage.getItem("volparia_local_admin") === "1") showAdmin();
     startSync();
   })();
 })();

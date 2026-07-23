@@ -8,6 +8,35 @@ const money = v => new Intl.NumberFormat("tr-TR", { style: "currency", currency:
 const uid = p => `${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const dateTr = v => v ? new Date(v.includes("T") || v.includes(" ") ? v.replace(" ", "T") + (v.endsWith("Z") ? "" : "Z") : v).toLocaleString("tr-TR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+function safeExternalUrl(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  try {
+    const url = new URL(text, location.href);
+    return url.protocol === "https:" ? url.href : "";
+  } catch { return ""; }
+}
+function sanitizeRichHtml(value) {
+  const template = document.createElement("template");
+  template.innerHTML = String(value || "");
+  const allowed = new Set(["P", "H2", "H3", "H4", "B", "STRONG", "EM", "BR", "UL", "OL", "LI", "TABLE", "THEAD", "TBODY", "TR", "TH", "TD", "A"]);
+  const blocked = new Set(["SCRIPT", "STYLE", "IFRAME", "OBJECT", "EMBED", "FORM", "INPUT", "BUTTON", "SVG", "MATH", "LINK", "META"]);
+  [...template.content.querySelectorAll("*")].forEach(el => {
+    if (blocked.has(el.tagName)) { el.remove(); return; }
+    if (!allowed.has(el.tagName)) {
+      el.replaceWith(...el.childNodes);
+      return;
+    }
+    const href = el.tagName === "A" ? safeExternalUrl(el.getAttribute("href")) : "";
+    [...el.attributes].forEach(attr => el.removeAttribute(attr.name));
+    if (href) {
+      el.href = href;
+      el.target = "_blank";
+      el.rel = "noopener noreferrer";
+    }
+  });
+  return template.innerHTML;
+}
 
 /* ---------- marka: tilki logosu ve ikonlar ---------- */
 const foxMark = `<svg viewBox="0 0 100 100" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M44 10 C45 13.5 46.3 16 48.5 18 L50.5 17.5 L53 9 C55.5 11.5 57 14 58 17 C61.5 18.5 64.5 21 67 24.5 L69.5 27.5 C65 30 60.5 30.3 56 28.8 C52 32.5 49.3 37 47.8 42 C46.6 46.5 46.6 51 48 56 C44.5 52.5 42.8 48 42.3 42.8 L39.8 41.8 L42.4 39.6 C42 34 42.6 28 43.2 22 L40.8 21 L43.4 19 C43.3 15.8 43.6 12.8 44 10 Z"/><path d="M57.5 31.5 C64 37 67.5 43.5 67.5 50.5 C67.5 58 63.5 65 56.5 70 C50 74.5 42.5 76.5 35 75.8 C27.8 75.1 21.5 72.4 16.5 67.8 C14.3 69.6 12.7 71.9 11.7 74.5 C15 74.8 18.2 74.1 21.2 72.7 C19.6 76.6 17.4 79.6 14.5 82 C20.8 83.4 27 82.8 33 80.5 C41.5 77.2 48.5 72 53.8 65 C55.8 60.5 56 54.5 55.6 48.5 C55.2 42 55.8 36 57.5 31.5 Z"/></svg>`;
@@ -101,7 +130,7 @@ function pageContent(key) {
     .replaceAll("{ADRES}", esc(s.companyAddress || "—"))
     .replaceAll("{EPOSTA}", esc(s.supportEmail || "—"))
     .replaceAll("{TELEFON}", esc(s.supportPhone || "—"));
-  return { title: custom?.title || base.title || "VOLPARIA", body };
+  return { title: custom?.title || base.title || "VOLPARIA", body: sanitizeRichHtml(body) };
 }
 
 /* ---------- durum ve kalıcılık ---------- */
@@ -154,7 +183,7 @@ window.addEventListener("popstate", () => { if (_layerOpen) { _layerOpen = false
 async function api(path, options = {}) {
   if (!CONFIG.apiBase) throw new Error("API_NOT_CONFIGURED");
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
-  if (state.token) headers.Authorization = `Bearer ${state.token}`;
+  if (state.token && document.body?.classList.contains("admin-body")) headers.Authorization = `Bearer ${state.token}`;
   let response;
   try { response = await fetch(`${CONFIG.apiBase.replace(/\/$/, "")}${path}`, { ...options, headers }); }
   catch { const err = new Error("Sunucuya ulaşılamadı — internet bağlantınızı kontrol edin"); err.network = true; throw err; }

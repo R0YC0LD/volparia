@@ -188,7 +188,7 @@
   function renderSocial() {
     const host = $("#footerSocial"); if (!host) return;
     const s = state.settings;
-    const links = [["instagram", s.instagram], ["tiktok", s.tiktok], ["twitter", s.twitter], ["whatsapp", s.whatsapp ? `https://wa.me/${String(s.whatsapp).replace(/\D/g, "")}` : ""]].filter(([, url]) => url);
+    const links = [["instagram", safeExternalUrl(s.instagram)], ["tiktok", safeExternalUrl(s.tiktok)], ["twitter", safeExternalUrl(s.twitter)], ["whatsapp", s.whatsapp ? `https://wa.me/${String(s.whatsapp).replace(/\D/g, "")}` : ""]].filter(([, url]) => url);
     host.innerHTML = links.map(([key, url]) => `<a href="${esc(url)}" target="_blank" rel="noopener" aria-label="${key}">${ICONS[key]}</a>`).join("");
   }
   function renderHeader() {
@@ -606,7 +606,7 @@
   function expandCartItems() {
     const items = [];
     state.cart.forEach(l => {
-      if (l.bundle) { const b = getBundle(l.bundleId); if (!b) return; bundleMembers(b).forEach(p => items.push({ id: p.id, size: (l.sizes || {})[p.id], quantity: l.quantity, bundle: b.name })); }
+      if (l.bundle) { const b = getBundle(l.bundleId); if (!b) return; bundleMembers(b).forEach(p => items.push({ id: p.id, size: (l.sizes || {})[p.id], quantity: l.quantity, bundleId: b.id })); }
       else items.push({ id: l.id, size: l.size, quantity: l.quantity });
     });
     return items;
@@ -615,9 +615,15 @@
     const form = checkoutData, payment = $("input[name=payment]:checked")?.value || "transfer";
     if (!form.email || !state.cart.length) { toast("Sipariş bilgileri eksik", false); return; }
     const t = cartTotals();
-    const order = { id: uid("ord"), orderNo: makeOrderNo(), customer: form, items: expandCartItems(), total: t.total, discount: t.discount, bundleDiscount: t.bundleSavings, coupon: state.coupon?.code || null, status: "new", paymentStatus: "awaiting", payment, createdAt: new Date().toISOString() };
+    const order = { id: uid("ord"), orderNo: makeOrderNo(), customer: form, items: expandCartItems(), total: t.total, discount: t.discount, coupon: state.coupon?.code || null, status: "new", paymentStatus: "awaiting", payment, createdAt: new Date().toISOString() };
+    let checkoutToken = "";
     if (state.apiOnline) {
-      try { const result = await api("/api/orders", { method: "POST", body: JSON.stringify(order) }); Object.assign(order, result.order || {}); }
+      try {
+        const result = await api("/api/orders", { method: "POST", body: JSON.stringify(order) });
+        Object.assign(order, result.order || {});
+        checkoutToken = String(order.checkoutToken || "");
+        delete order.checkoutToken;
+      }
       catch (e) { toast(e.message, false); return; }
     } else if (order.coupon) {
       const c = state.coupons.find(x => x.code === order.coupon);
@@ -631,7 +637,7 @@
     if (payment === "card" && state.apiOnline) {
       if (state.pos?.testMode) { done("POS test modu açık: karttan tahsilat yapılmadı, sipariş ödeme bekleniyor olarak kaydedildi."); bootstrapData(); return; }
       try {
-        const pay = await api("/api/payments/init", { method: "POST", body: JSON.stringify({ orderId: order.id }) });
+        const pay = await api("/api/payments/init", { method: "POST", body: JSON.stringify({ orderId: order.id, checkoutToken }) });
         if (pay.paymentPageUrl) { showPaymentRedirect(pay.paymentPageUrl); return; }
         if (pay.iframeUrl) { showPaymentFrame(pay.iframeUrl); return; }
         if (pay.mode === "test") { done("POS test modu açık: karttan tahsilat yapılmadı, sipariş ödeme bekleniyor olarak kaydedildi."); }

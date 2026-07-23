@@ -1,24 +1,51 @@
 // VOLPARIA Giyim — Cloudflare Workers + D1 veri katmanı (v2)
 const encoder = new TextEncoder();
+const SECURITY_HEADERS = {
+  "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+  "Cross-Origin-Resource-Policy": "same-site",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+  "Referrer-Policy": "no-referrer",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY"
+};
+let securitySchemaReady = false;
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const cors = corsHeaders(request.headers.get("Origin") || "");
-    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+    const origin = request.headers.get("Origin") || "";
+    const cors = corsHeaders(origin, env);
+    if (origin && !isAllowedOrigin(origin, env)) return json({ error: "Bu alan adından erişime izin verilmiyor" }, 403);
+    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: { ...SECURITY_HEADERS, ...cors } });
     try {
       // ---- herkese açık ----
       if (url.pathname === "/api/health" && request.method === "GET") return json({ ok: true, service: "volparia-api" }, 200, cors);
       if (url.pathname === "/api/sync" && request.method === "GET") return sync(env, cors);
       if (url.pathname === "/api/bootstrap" && request.method === "GET") return bootstrap(env, cors);
-      if (url.pathname === "/api/auth/login" && request.method === "POST") return login(request, env, cors);
-      if (url.pathname === "/api/orders" && request.method === "POST") return createOrder(request, env, cors);
-      if (url.pathname === "/api/newsletter" && request.method === "POST") return newsletter(request, env, cors);
+      if (url.pathname === "/api/auth/login" && request.method === "POST") {
+        const limited = await rateLimit(request, env, "admin-login", 8, 15 * 60_000, 30 * 60_000, cors);
+        return limited || login(request, env, cors);
+      }
+      if (url.pathname === "/api/orders" && request.method === "POST") {
+        const limited = await rateLimit(request, env, "order-create", 10, 10 * 60_000, 30 * 60_000, cors);
+        return limited || createOrder(request, env, cors);
+      }
+      if (url.pathname === "/api/newsletter" && request.method === "POST") {
+        const limited = await rateLimit(request, env, "newsletter", 5, 60 * 60_000, 60 * 60_000, cors);
+        return limited || newsletter(request, env, cors);
+      }
       if (url.pathname === "/api/coupons/validate" && request.method === "POST") return validateCouponRequest(request, env, cors);
       if (url.pathname === "/api/reviews" && request.method === "GET") return listPublicReviews(env, url.searchParams.get("product") || "", cors);
-      if (url.pathname === "/api/reviews" && request.method === "POST") return createReview(request, env, cors);
-      if (url.pathname.startsWith("/api/images/") && request.method === "GET") return serveImage(env, decodeURIComponent(url.pathname.split("/").pop()));
-      if (url.pathname === "/api/payments/init" && request.method === "POST") return paymentInit(request, env, cors);
+      if (url.pathname === "/api/reviews" && request.method === "POST") {
+        const limited = await rateLimit(request, env, "review-create", 5, 60 * 60_000, 2 * 60 * 60_000, cors);
+        return limited || createReview(request, env, cors);
+      }
+      if (url.pathname.startsWith("/api/images/") && request.method === "GET") return serveImage(env, decodeURIComponent(url.pathname.split("/").pop()), cors);
+      if (url.pathname === "/api/payments/init" && request.method === "POST") {
+        const limited = await rateLimit(request, env, "payment-init", 10, 10 * 60_000, 30 * 60_000, cors);
+        return limited || paymentInit(request, env, cors);
+      }
       if (url.pathname === "/api/payments/callback/iyzico") return iyzicoCallback(request, env, url);
       if (url.pathname === "/api/payments/webhook/paytr" && request.method === "POST") return paytrWebhook(request, env);
 
@@ -47,23 +74,89 @@ export default {
       return json({ error: "Endpoint bulunamadı" }, 404, cors);
     } catch (error) {
       console.error(error);
+      if (error instanceof HttpError) return json({ error: error.message }, error.status, cors);
       return json({ error: "Sunucu işlemi tamamlanamadı" }, 500, cors);
     }
   }
 };
 
-function corsHeaders(origin) {
-  return {
-    "Access-Control-Allow-Origin": origin || "*",
+class HttpError extends Error {
+  constructor(status, message) { super(message); this.status = status; }
+}
+function configuredOrigins(env) {
+  const values = new Set();
+  for (const candidate of String(env.ALLOWED_ORIGINS || "").split(",").map(v => v.trim()).filter(Boolean)) {
+    try { values.add(new URL(candidate).origin); } catch { /* geçersiz yapılandırma */ }
+  }
+  try { values.add(new URL(storefrontUrl(env)).origin); } catch { /* geçersiz yapılandırma */ }
+  return values;
+}
+function isAllowedOrigin(origin, env) {
+  return !origin || configuredOrigins(env).has(origin);
+}
+function corsHeaders(origin, env) {
+  const headers = {
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin"
   };
+  if (origin && isAllowedOrigin(origin, env)) headers["Access-Control-Allow-Origin"] = origin;
+  return headers;
 }
-function json(data, status = 200, headers = {}) { return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers } }); }
-async function body(request) { const data = await request.json(); if (!data || typeof data !== "object") throw new Error("Invalid body"); return data; }
+function json(data, status = 200, headers = {}) { return new Response(JSON.stringify(data), { status, headers: { ...SECURITY_HEADERS, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers } }); }
+async function body(request) {
+  const declared = Number(request.headers.get("Content-Length") || 0);
+  if (declared > 1_600_000) throw new HttpError(413, "İstek gövdesi çok büyük");
+  const text = await request.text();
+  if (text.length > 1_600_000) throw new HttpError(413, "İstek gövdesi çok büyük");
+  let data;
+  try { data = JSON.parse(text); } catch { throw new HttpError(400, "Geçersiz JSON gövdesi"); }
+  if (!data || typeof data !== "object" || Array.isArray(data)) throw new HttpError(400, "Geçersiz istek gövdesi");
+  return data;
+}
 function safeJson(value, fallback) { try { return JSON.parse(value); } catch { return fallback; } }
+function safeHttpsUrl(value, maxLength = 500) {
+  const text = String(value || "").trim().slice(0, maxLength);
+  if (!text) return "";
+  try {
+    const url = new URL(text);
+    return url.protocol === "https:" ? url.href : "";
+  } catch { return ""; }
+}
+function safeImageUrl(value) {
+  const text = String(value || "").trim();
+  if (/^data:image\/(?:webp|jpeg|png|gif);base64,[A-Za-z0-9+/=]+$/.test(text) && text.length <= 1_500_000) return text;
+  return safeHttpsUrl(text, 1000);
+}
+
+async function ensureSecuritySchema(env) {
+  if (securitySchemaReady) return;
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS request_limits (key TEXT PRIMARY KEY, request_count INTEGER NOT NULL DEFAULT 0, window_started INTEGER NOT NULL, blocked_until INTEGER NOT NULL DEFAULT 0, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)").run();
+  securitySchemaReady = true;
+}
+async function requestKey(request, env, scope) {
+  const ip = request.headers.get("CF-Connecting-IP") || request.headers.get("X-Forwarded-For")?.split(",")[0].trim() || "unknown";
+  return hmac(`${scope}:${ip}`, env.SESSION_SECRET || env.ADMIN_PASSWORD || "volparia-rate-limit");
+}
+async function rateLimit(request, env, scope, maxRequests, windowMs, blockMs, cors) {
+  await ensureSecuritySchema(env);
+  const key = await requestKey(request, env, scope);
+  const now = Date.now();
+  const row = await env.DB.prepare("SELECT request_count,window_started,blocked_until FROM request_limits WHERE key=?").bind(key).first();
+  if (row?.blocked_until > now) {
+    const retry = Math.max(1, Math.ceil((row.blocked_until - now) / 1000));
+    return json({ error: "Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin." }, 429, { ...cors, "Retry-After": String(retry) });
+  }
+  const sameWindow = row && now - Number(row.window_started) < windowMs;
+  const count = sameWindow ? Number(row.request_count) + 1 : 1;
+  const windowStarted = sameWindow ? Number(row.window_started) : now;
+  const blockedUntil = count > maxRequests ? now + blockMs : 0;
+  await env.DB.prepare("INSERT INTO request_limits(key,request_count,window_started,blocked_until,updated_at) VALUES(?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET request_count=excluded.request_count,window_started=excluded.window_started,blocked_until=excluded.blocked_until,updated_at=CURRENT_TIMESTAMP")
+    .bind(key, count, windowStarted, blockedUntil).run();
+  if (!blockedUntil) return null;
+  return json({ error: "Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin." }, 429, { ...cors, "Retry-After": String(Math.ceil(blockMs / 1000)) });
+}
 
 function rowToProduct(row) {
   return {
@@ -106,13 +199,16 @@ async function login(request, env, cors) {
   const data = await body(request);
   const expectedUser = env.ADMIN_USERNAME || "admin";
   const expectedPassword = env.ADMIN_PASSWORD;
-  if (!expectedPassword) return json({ error: "Yönetici şifresi sunucuda yapılandırılmamış" }, 503, cors);
+  if (!expectedPassword || String(expectedPassword).length < 12 || !env.SESSION_SECRET || String(env.SESSION_SECRET).length < 32) {
+    return json({ error: "Yönetici güvenlik sırları sunucuda güvenli biçimde yapılandırılmamış" }, 503, cors);
+  }
   const validUser = await constantEqual(String(data.username || ""), expectedUser);
   const validPassword = await constantEqual(String(data.password || ""), expectedPassword);
   if (!validUser || !validPassword) return json({ error: "Kullanıcı adı veya şifre hatalı" }, 401, cors);
-  const token = await signToken({ sub: expectedUser, exp: Date.now() + 12 * 60 * 60 * 1000 }, env.SESSION_SECRET);
+  const now = Date.now();
+  const token = await signToken({ sub: expectedUser, iss: "volparia-api", aud: "volparia-admin", iat: now, exp: now + 2 * 60 * 60 * 1000, jti: crypto.randomUUID() }, env.SESSION_SECRET);
   await audit(env, expectedUser, "admin.login", "session", null, {});
-  return json({ token, expiresIn: 43200 }, 200, cors);
+  return json({ token, expiresIn: 7200 }, 200, cors);
 }
 async function authorize(request, env) {
   const raw = request.headers.get("Authorization") || "";
@@ -122,7 +218,10 @@ async function authorize(request, env) {
   const expected = await hmac(payload, env.SESSION_SECRET);
   if (!(await constantEqual(signature, expected))) return null;
   const data = safeJson(decodeBase64Url(payload), null);
-  return data && data.exp > Date.now() ? data.sub : null;
+  const now = Date.now();
+  return data && data.iss === "volparia-api" && data.aud === "volparia-admin" &&
+    typeof data.sub === "string" && data.iat <= now + 60_000 && data.exp > now && data.exp - data.iat <= 2 * 60 * 60_000
+    ? data.sub : null;
 }
 async function signToken(data, secret) { if (!secret) throw new Error("SESSION_SECRET missing"); const payload = encodeBase64Url(JSON.stringify(data)); return `${payload}.${await hmac(payload, secret)}`; }
 async function hmac(value, secret) { const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]); const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(value)); return encodeBase64Url(new Uint8Array(sig)); }
@@ -130,7 +229,10 @@ async function constantEqual(a, b) { const [ha, hb] = await Promise.all([crypto.
 function toBase64(bytes) { let binary = ""; bytes.forEach(b => binary += String.fromCharCode(b)); return btoa(binary); }
 function fromBase64(value) { const binary = atob(value); return Uint8Array.from(binary, c => c.charCodeAt(0)); }
 function encodeBase64Url(value) { const bytes = typeof value === "string" ? encoder.encode(value) : value; return toBase64(bytes).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", ""); }
-function decodeBase64Url(value) { return new TextDecoder().decode(fromBase64(value.replaceAll("-", "+").replaceAll("_", "/"))); }
+function decodeBase64Url(value) {
+  const normalized = value.replaceAll("-", "+").replaceAll("_", "/");
+  return new TextDecoder().decode(fromBase64(normalized + "=".repeat((4 - normalized.length % 4) % 4)));
+}
 
 // ---- ürünler ----
 function sanitizeSizes(input) {
@@ -156,7 +258,7 @@ async function saveProduct(request, env, actor, id, cors) {
       p.badge ? String(p.badge).slice(0, 40) : null, JSON.stringify((Array.isArray(p.tags) ? p.tags : []).filter(t => ["new", "sale", "bestseller"].includes(t))),
       /^#[0-9a-fA-F]{6}$/.test(p.tone) ? p.tone : "#e8e2d6",
       String(p.description || "").slice(0, 2000), String(p.fabric || "").slice(0, 300), String(p.care || "").slice(0, 300),
-      p.imageUrl ? String(p.imageUrl).slice(0, 2000000) : null, JSON.stringify(sizes),
+      safeImageUrl(p.imageUrl) || null, JSON.stringify(sizes),
       Math.max(1, Math.round(Number(p.criticalStock) || 5)), p.active === false ? 0 : 1
     ).run();
   await bumpVersion(env);
@@ -274,10 +376,10 @@ async function uploadImage(request, env, actor, cors) {
   await audit(env, actor, "image.uploaded", "image", id, { contentType });
   return json({ id, url: `${new URL(request.url).origin}/api/images/${id}` }, 201, cors);
 }
-async function serveImage(env, id) {
+async function serveImage(env, id, cors) {
   const row = await env.DB.prepare("SELECT data, content_type FROM images WHERE id = ?").bind(id).first();
-  if (!row) return new Response("Not found", { status: 404 });
-  return new Response(fromBase64(row.data), { headers: { "Content-Type": row.content_type, "Cache-Control": "public, max-age=31536000, immutable", "Access-Control-Allow-Origin": "*" } });
+  if (!row) return new Response("Not found", { status: 404, headers: SECURITY_HEADERS });
+  return new Response(fromBase64(row.data), { headers: { ...SECURITY_HEADERS, ...cors, "Cross-Origin-Resource-Policy": "cross-origin", "Content-Type": row.content_type, "Cache-Control": "public, max-age=31536000, immutable" } });
 }
 async function deleteImage(env, actor, id, cors) {
   await env.DB.prepare("DELETE FROM images WHERE id = ?").bind(id).run();
@@ -286,12 +388,47 @@ async function deleteImage(env, actor, id, cors) {
 }
 
 // ---- siparişler ----
+function sanitizeCustomer(input) {
+  const source = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+  return {
+    firstName: String(source.firstName || "").trim().slice(0, 80),
+    lastName: String(source.lastName || "").trim().slice(0, 80),
+    email: String(source.email || "").trim().toLowerCase().slice(0, 160),
+    phone: String(source.phone || "").trim().slice(0, 40),
+    city: String(source.city || "").trim().slice(0, 80),
+    address: String(source.address || "").trim().slice(0, 500)
+  };
+}
+function calculateBundleDiscount(items, settings) {
+  const bundles = Array.isArray(settings?.bundles) ? settings.bundles : [];
+  let discount = 0;
+  for (const bundle of bundles) {
+    if (!bundle || bundle.active === false) continue;
+    const productIds = [...new Set((Array.isArray(bundle.productIds) ? bundle.productIds : []).map(String))];
+    if (productIds.length < 2) continue;
+    const counts = new Map();
+    for (const item of items) {
+      if (item.bundleId !== String(bundle.id || "")) continue;
+      counts.set(item.id, (counts.get(item.id) || 0) + item.quantity);
+    }
+    const completeSets = Math.min(...productIds.map(id => counts.get(id) || 0));
+    if (!Number.isFinite(completeSets) || completeSets <= 0) continue;
+    const setGross = productIds.reduce((sum, id) => sum + (items.find(item => item.id === id)?.unitPrice || 0), 0);
+    const percent = Math.max(0, Math.min(90, Number(bundle.discountPercent) || 0));
+    discount += completeSets * (setGross - Math.round(setGross * (100 - percent) / 100));
+  }
+  return Math.max(0, Math.round(discount));
+}
 async function createOrder(request, env, cors) {
   const data = await body(request);
-  const customer = data.customer || {};
-  const items = Array.isArray(data.items) ? data.items : [];
-  if (!data.id || !data.orderNo || !customer.email || !customer.address || !items.length) return json({ error: "Sipariş bilgileri eksik" }, 400, cors);
+  const customer = sanitizeCustomer(data.customer);
+  const items = Array.isArray(data.items) ? data.items.slice(0, 50) : [];
+  if (!customer.firstName || !customer.lastName || !customer.address || !customer.city || !customer.phone || !items.length ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email)) {
+    return json({ error: "Sipariş bilgileri eksik veya geçersiz" }, 400, cors);
+  }
   const ids = [...new Set(items.map(i => String(i.id)))];
+  if (!ids.length || ids.some(id => !/^[A-Za-z0-9_-]{1,80}$/.test(id))) return json({ error: "Sepette geçersiz ürün var" }, 400, cors);
   const marks = ids.map(() => "?").join(",");
   const rows = await env.DB.prepare(`SELECT id,name,price,sizes FROM products WHERE active=1 AND id IN (${marks})`).bind(...ids).all();
   const products = new Map(rows.results.map(p => [p.id, { ...p, sizeList: safeJson(p.sizes, []) }]));
@@ -309,35 +446,47 @@ async function createOrder(request, env, cors) {
     size.stock = Number(size.stock) - quantity;
     touched.add(p.id);
     gross += p.price * quantity;
-    normalized.push({ id: p.id, name: p.name, size: sizeName, unitPrice: p.price, quantity });
+    normalized.push({
+      id: p.id, name: p.name, size: sizeName, unitPrice: p.price, quantity,
+      bundleId: /^[A-Za-z0-9_-]{1,80}$/.test(String(item.bundleId || "")) ? String(item.bundleId) : ""
+    });
   }
-  let discount = 0, couponCode = null;
+  const settingsRow = await env.DB.prepare("SELECT value FROM store_settings WHERE key='store'").first();
+  const settings = safeJson(settingsRow?.value, {});
+  const bundleDiscount = Math.min(gross, calculateBundleDiscount(normalized, settings));
+  const couponBase = Math.max(0, gross - bundleDiscount);
+  let couponDiscount = 0, couponCode = null;
   if (data.coupon) {
-    const result = await findCoupon(env, String(data.coupon).trim().toUpperCase(), gross);
-    if (result.coupon) { discount = result.coupon.discount; couponCode = result.coupon.code; }
+    const result = await findCoupon(env, String(data.coupon).trim().toUpperCase(), couponBase);
+    if (result.coupon) { couponDiscount = result.coupon.discount; couponCode = result.coupon.code; }
   }
-  const bundleDiscount = Math.max(0, Math.min(gross, Math.round(Number(data.bundleDiscount) || 0)));
-  discount = Math.min(gross, discount + bundleDiscount);
+  const discount = Math.min(gross, bundleDiscount + couponDiscount);
   const total = Math.max(0, gross - discount);
   const method = ["card", "cod", "transfer"].includes(data.payment) ? data.payment : "transfer";
+  const id = `ord_${crypto.randomUUID().replaceAll("-", "")}`;
+  const orderNo = `VP-${new Date().toISOString().slice(2, 10).replaceAll("-", "")}-${crypto.randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase()}`;
+  const checkoutToken = encodeBase64Url(crypto.getRandomValues(new Uint8Array(32)));
   const statements = [
-    env.DB.prepare("INSERT INTO orders(id,order_no,customer_json,total,discount,coupon_code,status,payment_method,payment_status,shipping_address) VALUES(?,?,?,?,?,?,'new',?,'awaiting',?)")
-      .bind(data.id, String(data.orderNo).slice(0, 40), JSON.stringify(customer), total, discount, couponCode, method, String(customer.address || "").slice(0, 500))
+    env.DB.prepare("INSERT INTO orders(id,order_no,customer_json,total,discount,coupon_code,status,payment_method,payment_status,payment_token,shipping_address) VALUES(?,?,?,?,?,?,'new',?,'awaiting',?,?)")
+      .bind(id, orderNo, JSON.stringify(customer), total, discount, couponCode, method, checkoutToken, customer.address)
   ];
-  normalized.forEach(i => statements.push(env.DB.prepare("INSERT INTO order_items(order_id,product_id,product_name,size,unit_price,quantity) VALUES(?,?,?,?,?,?)").bind(data.id, i.id, i.name, i.size, i.unitPrice, i.quantity)));
+  normalized.forEach(i => statements.push(env.DB.prepare("INSERT INTO order_items(order_id,product_id,product_name,size,unit_price,quantity) VALUES(?,?,?,?,?,?)").bind(id, i.id, i.name, i.size, i.unitPrice, i.quantity)));
   touched.forEach(pid => statements.push(env.DB.prepare("UPDATE products SET sizes=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(JSON.stringify(products.get(pid).sizeList), pid)));
   if (couponCode) statements.push(env.DB.prepare("UPDATE coupons SET used_count=used_count+1 WHERE code=?").bind(couponCode));
   await env.DB.batch(statements);
   await bumpVersion(env);
-  await audit(env, "storefront", "order.created", "order", data.id, { orderNo: data.orderNo, total, discount, coupon: couponCode });
-  return json({ order: { id: data.id, orderNo: data.orderNo, total, discount, coupon: couponCode, status: "new" } }, 201, cors);
+  await audit(env, "storefront", "order.created", "order", id, { orderNo, total, discount, bundleDiscount, couponDiscount, coupon: couponCode });
+  return json({ order: { id, orderNo, total, discount, bundleDiscount, couponDiscount, coupon: couponCode, status: "new", checkoutToken } }, 201, cors);
 }
 async function listOrders(env, cors) {
   const rows = await env.DB.prepare("SELECT * FROM orders ORDER BY created_at DESC LIMIT 300").all();
   const itemsRows = await env.DB.prepare("SELECT order_id, product_id id, product_name, size, unit_price, quantity FROM order_items").all();
   const byOrder = new Map();
   itemsRows.results.forEach(i => { (byOrder.get(i.order_id) || byOrder.set(i.order_id, []).get(i.order_id)).push(i); });
-  return json({ orders: rows.results.map(o => ({ ...o, customer: safeJson(o.customer_json, {}), items: byOrder.get(o.id) || [] })) }, 200, cors);
+  return json({ orders: rows.results.map(o => {
+    const { customer_json, payment_token, ...safeOrder } = o;
+    return { ...safeOrder, customer: safeJson(customer_json, {}), items: byOrder.get(o.id) || [] };
+  }) }, 200, cors);
 }
 async function updateOrder(request, env, actor, id, cors) {
   const data = await body(request);
@@ -384,8 +533,8 @@ async function saveSettings(request, env, actor, cors) {
     iban: String(data.iban || "").slice(0, 40),
     companyName: String(data.companyName || "").slice(0, 120), companyAddress: String(data.companyAddress || "").slice(0, 240),
     seoTitle: String(data.seoTitle || "").slice(0, 80), seoDescription: String(data.seoDescription || "").slice(0, 180),
-    instagram: String(data.instagram || "").slice(0, 200), tiktok: String(data.tiktok || "").slice(0, 200),
-    twitter: String(data.twitter || "").slice(0, 200), whatsapp: String(data.whatsapp || "").slice(0, 40),
+    instagram: safeHttpsUrl(data.instagram, 200), tiktok: safeHttpsUrl(data.tiktok, 200),
+    twitter: safeHttpsUrl(data.twitter, 200), whatsapp: String(data.whatsapp || "").replace(/\D/g, "").slice(0, 15),
     bundles: (Array.isArray(data.bundles) ? data.bundles : []).slice(0, 40).map(b => ({
       id: (String(b.id || "").slice(0, 40)) || `b_${crypto.randomUUID().slice(0, 8)}`,
       name: String(b.name || "").slice(0, 120),
@@ -431,7 +580,9 @@ async function exportAll(env, cors) {
     exportedAt: new Date().toISOString(),
     products: products.results.map(rowToProduct),
     settings: safeJson(settings?.value, {}),
-    coupons: coupons.results, orders: orders.results, reviews: reviews.results, subscribers: subscribers.results
+    coupons: coupons.results,
+    orders: orders.results.map(({ payment_token, ...order }) => order),
+    reviews: reviews.results, subscribers: subscribers.results
   }, 200, cors);
 }
 
@@ -483,7 +634,10 @@ async function posCredentialStatus(env, cors) {
 
 async function paymentInit(request, env, cors) {
   const data = await body(request);
-  const order = await env.DB.prepare("SELECT * FROM orders WHERE id = ?").bind(String(data.orderId || "")).first();
+  const orderId = String(data.orderId || "");
+  const checkoutToken = String(data.checkoutToken || "");
+  if (!orderId || !checkoutToken) return json({ error: "Ödeme doğrulama bilgisi eksik" }, 400, cors);
+  const order = await env.DB.prepare("SELECT * FROM orders WHERE id = ? AND payment_token = ?").bind(orderId, checkoutToken).first();
   if (!order) return json({ error: "Sipariş bulunamadı" }, 404, cors);
   if (order.payment_status === "paid") return json({ error: "Sipariş zaten ödendi" }, 409, cors);
   const settingsRow = await env.DB.prepare("SELECT value FROM store_settings WHERE key='store'").first();
@@ -494,14 +648,14 @@ async function paymentInit(request, env, cors) {
   if (!creds) return json({ error: "Ödeme sağlayıcısı henüz yapılandırılmadı. Yönetim panelinden Sanal POS bilgilerini girin.", mode: "unconfigured" }, 409, cors);
   const customer = safeJson(order.customer_json, {});
   const items = (await env.DB.prepare("SELECT product_id,product_name,unit_price,quantity FROM order_items WHERE order_id = ?").bind(order.id).all()).results;
-  const clientIp = request.headers.get("CF-Connecting-IP") || "85.34.78.112";
+  const clientIp = request.headers.get("CF-Connecting-IP") || "0.0.0.0";
   try {
     if (provider === "iyzico") {
       const result = await iyzicoInit(creds, order, customer, items, settings, request);
       if (result.error) return json({ error: result.error }, 502, cors);
       await env.DB.prepare("UPDATE orders SET payment_token=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(result.token, order.id).run();
       await audit(env, "storefront", "payment.initialized", "order", order.id, { provider });
-      return json({ mode: "live", provider, paymentPageUrl: result.paymentPageUrl, token: result.token }, 200, cors);
+      return json({ mode: "live", provider, paymentPageUrl: result.paymentPageUrl }, 200, cors);
     }
     const result = await paytrInit(env, creds, order, customer, items, clientIp);
     if (result.error) return json({ error: result.error }, 502, cors);
